@@ -1,0 +1,2556 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="サイコロで戦うターン制ローグライクRPG。ダイスを振って、装備とスキルを育てて地下20階を目指そう。20階のあとは、インフレするエンドレスが待っている。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8E%B2%3C/text%3E%3C/svg%3E">
+<title>ちいさな迷宮 ダイス版</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+:root{
+  --bg:#c9d4ee; --bg2:#e6ebf9;
+  --win-a:#2c3ca3; --win-b:#17216f; --line:#f3f6ff;
+  --ink:#f4f6ff; --dim:#bcc6f2;
+  --hp:#5fe08a; --mp:#5cc8ff; --exp:#ffd45c; --bad:#ff6b6b;
+  --floor-a:#0a0e33; --floor-b:#251a52;
+  --die:#f4f1e8; --pip:#1b1b2c;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0a0c1b; --bg2:#12162f;
+    --win-a:#1c2a7a; --win-b:#0a0f3d; --line:#dde5ff;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0a0c1b; --bg2:#12162f;
+  --win-a:#1c2a7a; --win-b:#0a0f3d; --line:#dde5ff;
+}
+*{box-sizing:border-box}
+html{background:var(--bg);height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0;min-height:100%;
+  background:linear-gradient(var(--bg2),var(--bg));
+  color:var(--ink);
+  font-family:"DotGothic16","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+  font-size:15px;line-height:1.5;
+}
+button{font:inherit;color:inherit}
+#app{max-width:460px;margin:0 auto;padding:10px;display:flex;flex-direction:column;gap:8px}
+.win{
+  position:relative;
+  background:linear-gradient(var(--win-a),var(--win-b));
+  border:3px solid var(--line);border-radius:6px;
+  box-shadow:0 0 0 2px var(--win-b) inset,0 3px 0 rgba(0,0,0,.35);
+  color:var(--ink);padding:10px 12px;
+}
+.sub{color:var(--dim);font-size:13px}
+
+/* header */
+#hdr{display:flex;justify-content:space-between;align-items:center;padding:8px 12px}
+#depth{font-size:18px}
+#pips{display:flex;gap:3px;align-items:center;flex-wrap:nowrap;justify-content:flex-end;flex-shrink:0}
+.dleft{display:flex;flex-direction:column;line-height:1.3;min-width:0}
+.dleft .sub{font-size:12px}
+.pip{display:block;width:10px;height:10px;border:2px solid var(--line);border-radius:2px;opacity:.8}
+.pip.boss{width:12px;height:12px;transform:rotate(45deg);border-radius:1px}
+.pip.done{background:var(--line);opacity:.45}
+.pip.now{background:var(--exp);border-color:var(--exp);opacity:1}
+
+/* scene */
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+#ename{font-size:17px}
+.bar{height:12px;background:rgba(0,0,0,.45);border:2px solid var(--line);border-radius:3px;overflow:hidden}
+.bar>i{display:block;height:100%;width:100%;background:var(--hp);transition:width .35s ease-out}
+.bar.mp>i{background:var(--mp)}
+.bar.xp>i{background:var(--exp)}
+.bar.low>i{background:var(--bad)}
+.stage{
+  position:relative;margin-top:8px;height:196px;overflow:hidden;
+  display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;
+  background:linear-gradient(var(--floor-a) 0 70%,var(--floor-b) 70% 100%);
+  border:2px solid rgba(255,255,255,.35);border-radius:4px;
+}
+#eart{display:flex;align-items:flex-end;justify-content:center}
+#eart svg{display:block}
+#eart.enter{animation:enter .45s ease-out}
+#eart.shake{animation:shake .28s}
+#estatus{position:absolute;left:6px;top:6px;display:flex;gap:4px}
+.chip{font-size:12px;line-height:1.4;border:1px solid var(--line);border-radius:3px;padding:0 6px;background:rgba(255,255,255,.12)}
+.intent{margin-top:8px;font-size:14px;color:var(--dim)}
+.intent b{color:var(--ink);font-weight:normal}
+
+/* log */
+#log{display:flex;flex-direction:column;justify-content:flex-end;height:7.3em;overflow:hidden;padding:8px 12px;font-size:14px}
+#log div{color:var(--dim)}
+#log div.new{color:var(--ink)}
+
+/* player */
+#pl.flash::after{content:"";position:absolute;inset:0;border-radius:3px;background:rgba(255,70,70,.45);animation:flash .35s ease-out forwards;pointer-events:none}
+.pname{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.stat{display:grid;grid-template-columns:30px 1fr 64px;align-items:center;gap:8px;margin-top:4px}
+.stat .num{text-align:right;font-size:13px}
+.stat.xpr{opacity:.9}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+
+/* commands */
+.grp{color:var(--dim);font-size:13px;margin:8px 0 4px}
+.grp:first-child{margin-top:0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.cb{
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;
+  min-height:52px;padding:6px 10px;text-align:left;cursor:pointer;
+  background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.4);border-radius:4px;
+}
+.cb .nm{font-size:16px}
+.cb .in{font-size:12px;color:var(--dim)}
+.cb .res{color:var(--ink)}
+.cb:hover:not(:disabled),.cb:focus-visible{background:rgba(255,255,255,.18);outline:2px solid var(--line);outline-offset:1px}
+.cb:active:not(:disabled){transform:translateY(1px)}
+.cb:disabled{opacity:.45;cursor:not-allowed}
+
+/* dice */
+.dhead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.dbtns{display:flex;gap:6px}
+.sbtn{min-height:36px;padding:4px 10px;font-size:14px;white-space:nowrap;cursor:pointer;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.45);border-radius:4px}
+.sbtn:hover:not(:disabled),.sbtn:focus-visible{background:rgba(255,255,255,.22);outline:2px solid var(--line);outline-offset:1px}
+.sbtn:disabled{opacity:.4;cursor:not-allowed}
+.dicebar{display:flex;gap:10px;justify-content:center;align-items:center;min-height:68px;margin:10px 0 4px;flex-wrap:wrap}
+.die{width:56px;height:56px;padding:6px;border-radius:10px;cursor:pointer;background:var(--die);border:3px solid #2b2b40;box-shadow:0 3px 0 rgba(0,0,0,.4);transition:transform .12s}
+.die .face{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);width:100%;height:100%}
+.die .face i{display:block;width:78%;height:78%;margin:auto;border-radius:50%}
+.die .face i.on{background:var(--pip)}
+.die{position:relative}
+.die .big{display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:30px;color:var(--pip);line-height:1}
+.die .tag{position:absolute;right:-4px;bottom:-6px;font-style:normal;font-size:11px;line-height:1;padding:2px 4px;border-radius:4px;background:#2b2b40;color:#fff;border:1px solid rgba(255,255,255,.6)}
+.die.t-even{background:#cfe3ff}
+.die.t-high{background:#ffe3b8}
+.die.t-gamble{background:#e6c9ff}
+.die.t-d8{background:#c9f2d6}
+.die.t-fire{background:#ffc3a8}
+.die.t-gold{background:#ffe27a}
+.die.t-d4{background:#d7e6ff}
+.die.t-d10{background:#d2f4e4}
+.die.t-odd{background:#ffd9e7}
+.die.t-lucky{background:#fff0a8}
+.die.t-ice{background:#bdefff}
+.die.t-thunder{background:#fff19a}
+.die.t-poison{background:#cde8a7}
+.die.sel{transform:translateY(-6px);outline:3px solid var(--exp);outline-offset:2px}
+.stage.l2{--floor-a:#1a1007;--floor-b:#4f3216}
+.stage.l3{--floor-a:#05141a;--floor-b:#1d3c42}
+.stage.l4{--floor-a:#10152e;--floor-b:#3a397b}
+.die.used{opacity:.28;filter:grayscale(1);cursor:default}
+.die.roll{animation:tumble .14s linear infinite}
+.hint{text-align:center;font-size:13px;color:var(--dim);min-height:1.5em}
+
+/* popups */
+.pop{
+  position:absolute;left:50%;top:42%;transform:translateX(-50%);
+  font-size:30px;pointer-events:none;color:#fff;
+  text-shadow:0 2px 0 #000,2px 0 0 #000,-2px 0 0 #000,0 -2px 0 #000;
+  animation:pop .9s ease-out forwards;z-index:3;
+}
+#pl .pop{top:6px;font-size:24px}
+.pop.gold{color:#ffd45c}
+.eqh{font-size:13px;color:var(--dim);margin-bottom:6px}
+.eq.leg b{color:var(--exp)}
+.card.legend{border-color:#ffd45c;background:linear-gradient(135deg,rgba(255,212,92,.24),rgba(255,120,60,.16))}
+.card.legend em{color:#ffd45c}
+.eqpanel{border:2px solid rgba(255,255,255,.3);border-radius:6px;padding:8px;background:rgba(255,255,255,.06);font-size:13px;margin-bottom:2px}
+.eqrow{display:grid;grid-template-columns:62px 1fr auto;gap:8px;padding:4px 6px;align-items:center}
+.eqrow .es,.eqpanel .es{font-size:12px;color:var(--dim)}
+.lgbtns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.lgbox{max-height:52vh;overflow:auto;font-size:13px;line-height:1.55;padding:8px;border:2px solid rgba(255,255,255,.3);border-radius:6px;background:rgba(0,0,0,.25);-webkit-overflow-scrolling:touch}
+.lg{white-space:pre-wrap;word-break:break-all;color:var(--dim)}
+.lg.battle{margin-top:10px;color:var(--exp);font-size:14px}
+.lg.turn{margin-top:8px;color:var(--ink);border-top:1px solid rgba(255,255,255,.25);padding-top:4px}
+.lg.roll{color:#bfe3ff}
+.lg.act{color:var(--ink)}
+.lg.take{color:#ffb4b4}
+.lg.s{color:var(--dim)}
+.eq{display:grid;grid-template-columns:62px 1fr auto;gap:2px 8px;padding:4px 6px;border-radius:5px;border:2px solid transparent;align-items:center}
+.eq b.none{color:var(--dim);opacity:.7;font-weight:normal}
+.mv{display:flex;gap:4px}
+.mvb{min-width:34px;min-height:30px;padding:0 6px;font-size:13px;cursor:pointer;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.4);border-radius:4px}
+.mvb:hover:not(:disabled),.mvb:focus-visible{background:rgba(255,255,255,.22);outline:2px solid var(--line);outline-offset:1px}
+.mvb:disabled{opacity:.3;cursor:not-allowed}
+.eq .es{font-size:12px;color:var(--dim)}
+.eq b{font-weight:normal}
+.eq .ed{grid-column:2 / span 2;font-size:12px;color:var(--dim);line-height:1.35}
+.eq .ed.none{color:var(--dim);opacity:.7}
+.eq.hot{background:rgba(255,212,92,.25);border-color:var(--exp)}
+#casc{position:absolute;left:6px;top:34px;right:6px;display:flex;flex-direction:column;gap:2px;font-size:13px;pointer-events:none;z-index:2}
+#casc .cl{width:fit-content;max-width:100%;background:rgba(5,8,40,.78);border-radius:4px;padding:1px 7px;animation:clin .18s ease-out}
+#casc .cl em{font-style:normal;color:var(--exp);margin-left:4px}
+#bigscore{position:absolute;right:10px;bottom:6px;font-size:44px;line-height:1;color:#fff3a8;text-shadow:0 3px 0 #000,2px 0 0 #000,-2px 0 0 #000;pointer-events:none;z-index:2}
+#bigscore.pulse{animation:bpulse .22s ease-out}
+@keyframes clin{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+@keyframes bpulse{0%{transform:scale(.7)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+.tally{display:grid;grid-template-columns:repeat(var(--cols,6),1fr);gap:6px;margin:10px 0 6px}
+.tcol{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px 4px;border:2px solid rgba(255,255,255,.35);border-radius:8px;background:rgba(255,255,255,.07);cursor:pointer;min-height:92px;color:var(--ink)}
+.tcol:hover,.tcol:focus-visible{background:rgba(255,255,255,.18);outline:2px solid var(--line);outline-offset:1px}
+.tcol.zero{opacity:.4}
+.tcol.top{border-color:var(--hp)}
+.tcol.lock{border-color:var(--exp);background:rgba(255,212,92,.2)}
+.tcol .cnt{font-size:22px;line-height:1.1}
+.tcol .keep{font-size:11px;line-height:1.2;min-height:1.2em;color:var(--hp)}
+.tcol.lock .keep{color:var(--exp)}
+.tcol.roll .cnt{animation:flick .16s linear infinite}
+.mini{display:block;width:32px;height:32px;padding:3px;border-radius:7px;background:var(--die);border:2px solid #2b2b40}
+.mini .face{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);width:100%;height:100%}
+.mini .face i{display:block;width:80%;height:80%;margin:auto;border-radius:50%}
+.mini .face i.on{background:var(--pip)}
+.mini .big{display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:17px;color:var(--pip);line-height:1}
+.score{display:flex;justify-content:center;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:14px;margin:6px 0 2px}
+.score b{font-weight:normal;font-size:20px}
+.score .tot{font-size:26px;color:var(--exp)}
+.score .jp{font-style:normal;color:#ff8a5c;font-size:13px}
+.pop.big{font-size:46px;color:#fff3a8;animation:popbig 1s ease-out forwards}
+#eart.shakebig{animation:shakebig .4s}
+@keyframes flick{0%{transform:translateY(-2px)}50%{transform:translateY(2px)}100%{transform:translateY(-2px)}}
+@keyframes popbig{0%{opacity:0;transform:translateX(-50%) scale(.6)}20%{opacity:1;transform:translateX(-50%) scale(1.25)}100%{opacity:0;transform:translateX(-50%) scale(1) translateY(-50px)}}
+@keyframes shakebig{0%,100%{transform:translateX(0)}15%{transform:translateX(-16px) rotate(-3deg)}35%{transform:translateX(14px) rotate(3deg)}60%{transform:translateX(-9px)}80%{transform:translateX(5px)}}
+.goldtxt{color:var(--exp)}
+.pop.dmg{color:#ffe27a}
+.pop.hurt{color:#ff8a8a}
+.pop.heal{color:#8dffb0}
+.pop.miss{color:#d6dcff}
+
+/* overlay */
+.ov{position:fixed;inset:0;z-index:10;display:flex;align-items:flex-start;justify-content:center;padding:16px;background:rgba(6,8,24,.82);overflow:auto}
+.ov[hidden]{display:none}
+.box{width:100%;max-width:420px;padding:16px;margin:auto}
+.box h2{margin:0 0 4px;font-size:22px;font-weight:normal}
+.box p{margin:0 0 12px}
+.box ul{margin:0 0 14px;padding-left:1.1em;color:var(--dim);font-size:14px}
+.box li{margin:2px 0}
+#ovB{display:flex;flex-direction:column;gap:8px}
+.card{
+  display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;
+  padding:10px 12px;text-align:left;cursor:pointer;
+  background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.45);border-radius:4px;
+}
+.card .ct{display:flex;justify-content:space-between;align-items:baseline;gap:8px;width:100%}
+.card b{font-weight:normal;font-size:17px}
+.card em{font-style:normal;font-size:12px;color:var(--exp)}
+.card .cd{font-size:13px;color:var(--dim)}
+.card:hover,.card:focus-visible{background:rgba(255,255,255,.2);outline:2px solid var(--line);outline-offset:1px}
+.card:disabled{opacity:.45;cursor:not-allowed}
+.card em.gld{color:var(--exp)}
+.card.go{align-items:center;justify-content:center;margin-top:2px}
+
+/* codex */
+.cdtabs{display:flex;gap:6px;margin-bottom:4px}
+.cdtab{flex:1;padding:6px 4px;text-align:center;cursor:pointer;line-height:1.3;
+  background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.35);border-radius:4px}
+.cdtab small{font-size:11px;color:var(--dim)}
+.cdtab.on{background:rgba(255,255,255,.22);border-color:var(--line)}
+.cdh{margin:8px 0 0;font-size:13px;color:var(--exp)}
+.card.cdx{cursor:default}
+.card.cdx:hover{background:rgba(255,255,255,.08);outline:none}
+.card.cdx.seen{opacity:.75}
+.card.cdx.unk{opacity:.45}
+.card.cdx.own em{color:var(--hp)}
+.nw{display:inline-block;margin-left:6px;padding:0 5px;border-radius:3px;font-size:11px;line-height:1.5;vertical-align:2px;background:var(--exp);color:#1c1c2e}
+.nw.un{background:transparent;border:1px solid var(--exp);color:var(--exp);padding:0 4px}
+.cdnote{font-size:12px;color:var(--dim);margin:0 0 4px}
+@keyframes tumble{0%{transform:rotate(-12deg) translateY(-3px)}50%{transform:rotate(12deg) translateY(2px)}100%{transform:rotate(-12deg) translateY(-3px)}}
+@keyframes pop{0%{opacity:0;margin-top:10px}15%{opacity:1}100%{opacity:0;margin-top:-46px}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-9px)}45%{transform:translateX(8px)}70%{transform:translateX(-5px)}}
+@keyframes flash{from{opacity:1}to{opacity:0}}
+@keyframes enter{from{opacity:0;transform:translateY(14px) scale(.9)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){
+  *{animation:none!important;transition:none!important}
+}
+
+/* profiles */
+.pfin{display:block;width:100%;box-sizing:border-box;padding:10px;margin:6px 0;font:inherit;font-size:14px;color:inherit;resize:vertical;
+  background:rgba(0,0,0,.28);border:2px solid rgba(255,255,255,.45);border-radius:4px}
+textarea.pfin{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all}
+.pfbtns{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pfmsg{display:block;color:var(--exp);font-size:13px;min-height:1.2em;margin:2px 0 6px}
+
+/* 目の役割 */
+.tcol .role{font-size:13px;line-height:1.1}
+.roles{display:flex;flex-wrap:wrap;gap:4px;margin:2px 0 6px;min-height:1.4em}
+
+/* 行動の順番 */
+.tl{display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin:2px 0 8px}
+.tlc{display:inline-flex;align-items:baseline;gap:5px;padding:4px 8px;font-size:13px;line-height:1.3;color:inherit;
+  background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.45);border-radius:4px}
+.tlc b{font-size:15px;color:var(--exp)}
+button.tlc{cursor:pointer;font-family:inherit}
+button.tlc:hover,button.tlc:focus-visible{background:rgba(255,255,255,.22);outline:2px solid var(--line)}
+.tlc.empty{opacity:.55;border-style:dashed}
+.tlc.en{background:rgba(255,110,110,.16);border-color:rgba(255,130,130,.8)}
+.tla{opacity:.6;font-style:normal;padding:0 1px}
+
+.tlhint{margin:-4px 0 6px;font-size:12px}
+</style>
+</head>
+<body>
+<main id="app">
+  <header class="win" id="hdr">
+    <span class="dleft"><span id="depth"></span><span class="sub" id="layer"></span></span>
+    <span id="pips" aria-hidden="true"></span>
+  </header>
+
+  <section class="win" id="scene">
+    <div class="row"><span id="ename"></span><span class="sub" id="ehpTxt"></span></div>
+    <div class="bar" id="ebar" style="margin-top:4px"><i id="ehp"></i></div>
+    <div class="stage" id="stg">
+      <div id="estatus"></div>
+      <div id="casc"></div>
+      <div id="bigscore"></div>
+      <div id="eart"></div>
+    </div>
+    <div class="intent" id="intent"></div>
+  </section>
+
+  <section class="win" id="log" aria-live="polite"></section>
+
+  <section class="win" id="pl">
+    <div class="pname"><span>勇者 <span id="lv"></span></span><span id="gold" class="goldtxt"></span></div>
+    <div class="stat"><span>HP</span><div class="bar" id="hpbar"><i id="hp"></i></div><span class="num" id="hpTxt"></span></div>
+    <div class="stat"><span>MP</span><div class="bar mp"><i id="mp"></i></div><span class="num" id="mpTxt"></span></div>
+    <div class="chips" id="chips"></div>
+    <div class="sub" id="rec" style="margin-top:6px"></div>
+  </section>
+
+  <section class="win" id="dice"></section>
+
+  <section class="win" id="cmd"></section>
+
+  <section class="win" id="equip"></section>
+</main>
+
+<div class="ov" id="ov" hidden>
+  <div class="win box" role="dialog" aria-modal="true" aria-labelledby="ovT">
+    <h2 id="ovT"></h2>
+    <p class="sub" id="ovS"></p>
+    <div id="ovB"></div>
+  </div>
+</div>
+
+<script>
+/* ===== 軽量 xlsx リーダー（外部ライブラリ不要）=====
+   .xlsx は zip の中に XML が入ったファイル。ブラウザ標準の DecompressionStream と DOMParser だけで読む。
+   readXlsx(ArrayBuffer) → { シート名: [ [セル,セル,...], ... ] }  （空のセルは undefined） */
+async function inflateRaw(bytes){
+  if(typeof DecompressionStream==='undefined')throw new Error('このブラウザは DecompressionStream に未対応です（新しいブラウザで開いてください）');
+  const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+async function unzip(buf){
+  const u8=new Uint8Array(buf),dv=new DataView(buf);
+  let eocd=-1;
+  for(let i=u8.length-22;i>=Math.max(0,u8.length-65557);i--){if(dv.getUint32(i,true)===0x06054b50){eocd=i;break}}
+  if(eocd<0)throw new Error('xlsx（zip）として読めません');
+  const count=dv.getUint16(eocd+10,true);let ptr=dv.getUint32(eocd+16,true);
+  const dec=new TextDecoder('utf-8'),files={};
+  for(let n=0;n<count;n++){
+    if(dv.getUint32(ptr,true)!==0x02014b50)throw new Error('zipの構造が不正です');
+    const method=dv.getUint16(ptr+10,true),csize=dv.getUint32(ptr+20,true);
+    const nl=dv.getUint16(ptr+28,true),el=dv.getUint16(ptr+30,true),cl=dv.getUint16(ptr+32,true),off=dv.getUint32(ptr+42,true);
+    const name=dec.decode(u8.subarray(ptr+46,ptr+46+nl));
+    ptr+=46+nl+el+cl;
+    const start=off+30+dv.getUint16(off+26,true)+dv.getUint16(off+28,true);
+    const data=u8.subarray(start,start+csize);
+    files[name]={method,data};
+  }
+  const read=async name=>{
+    const f=files[name];if(!f)return null;
+    const bytes=f.method===0?f.data:f.method===8?await inflateRaw(f.data):null;
+    if(!bytes)throw new Error('未対応の圧縮方式です: '+name);
+    return dec.decode(bytes);
+  };
+  return {read,has:n=>!!files[n]};
+}
+const parseXml=s=>new DOMParser().parseFromString(s,'application/xml');
+const colIndex=ref=>{let n=0;for(const ch of ref.replace(/[0-9]/g,''))n=n*26+ch.charCodeAt(0)-64;return n-1};
+async function readXlsx(buf){
+  const z=await unzip(buf);
+  // 共有文字列（ふりがな<rPh>は除く）
+  const shared=[];
+  const ssXml=await z.read('xl/sharedStrings.xml');
+  if(ssXml){
+    for(const si of parseXml(ssXml).getElementsByTagName('si')){
+      let t='';
+      for(const x of si.getElementsByTagName('t')){if(x.parentNode.nodeName!=='rPh')t+=x.textContent}
+      shared.push(t);
+    }
+  }
+  // シート名 → ファイル
+  const wb=parseXml(await z.read('xl/workbook.xml'));
+  const rels=parseXml(await z.read('xl/_rels/workbook.xml.rels'));
+  const target={};
+  for(const r of rels.getElementsByTagName('Relationship')){
+    let t=r.getAttribute('Target');t=t.startsWith('/')?t.slice(1):'xl/'+t;
+    target[r.getAttribute('Id')]=t;
+  }
+  const out={};
+  for(const sh of wb.getElementsByTagName('sheet')){
+    const path=target[sh.getAttribute('r:id')];
+    const xml=path&&await z.read(path);
+    if(!xml)continue;
+    const rows=[];
+    for(const row of parseXml(xml).getElementsByTagName('row')){
+      const ri=(+row.getAttribute('r'))-1,arr=[];
+      for(const c of row.getElementsByTagName('c')){
+        const t=c.getAttribute('t'),vEl=c.getElementsByTagName('v')[0];
+        let v;
+        if(t==='inlineStr'){v='';for(const x of c.getElementsByTagName('t')){if(x.parentNode.nodeName!=='rPh')v+=x.textContent}}
+        else if(!vEl||vEl.textContent==='')continue;
+        else if(t==='s')v=shared[+vEl.textContent];
+        else if(t==='b')v=vEl.textContent==='1';
+        else if(t==='str'||t==='e')v=vEl.textContent;
+        else v=Number(vEl.textContent);
+        arr[colIndex(c.getAttribute('r'))]=v;
+      }
+      rows[ri]=arr;
+    }
+    out[sh.getAttribute('name')]=Array.from(rows,r=>r||[]);
+  }
+  return out;
+}
+
+/* ===== 敵・階層まわり =====
+   敵のイラスト(SVG)、階層の名前、敵のステータスと行動パターン、HP・攻撃力の伸び方。
+   敵を足したいときは ENEMIES に1行足す（1層ぶん＝FLOORS÷層の数、の並びで書く）。 */
+/* ===== 敵のイラスト(SVG) ===== */
+function crown(x,y,s){return `<g transform="translate(${x} ${y}) scale(${s})"><path d="M-24 0 L-20 -26 L-8 -12 L0 -32 L8 -12 L20 -26 L24 0 Z" fill="#ffd24a" stroke="#a87400" stroke-width="3" stroke-linejoin="round"/><circle cx="0" cy="-10" r="3.5" fill="#e23b4e"/></g>`}
+function slimeSVG(c,d,o={}){const sc=o.scale||1,w=Math.round(150*sc);
+  return `<svg viewBox="0 0 160 160" width="${w}" height="${w}" role="img" aria-label="スライム">
+  <ellipse cx="80" cy="142" rx="58" ry="9" fill="rgba(0,0,0,.35)"/>
+  <path d="M18 134 C10 88 42 38 80 38 C118 38 150 88 142 134 Q80 148 18 134Z" fill="${c}" stroke="${d}" stroke-width="4" stroke-linejoin="round"/>
+  <ellipse cx="54" cy="68" rx="14" ry="8" fill="#fff" opacity=".55" transform="rotate(-35 54 68)"/>
+  <ellipse cx="62" cy="98" rx="8" ry="11" fill="#14162b"/><ellipse cx="98" cy="98" rx="8" ry="11" fill="#14162b"/>
+  <circle cx="65" cy="94" r="3" fill="#fff"/><circle cx="101" cy="94" r="3" fill="#fff"/>
+  <path d="M68 118 Q80 128 92 118" stroke="#14162b" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  ${o.crown?crown(80,40,1.1):''}</svg>`}
+function goblinSVG(skin,dark,o={}){const sc=o.scale||1,w=Math.round(150*sc);
+  return `<svg viewBox="0 0 160 160" width="${w}" height="${w}" role="img" aria-label="ゴブリン">
+  <ellipse cx="80" cy="150" rx="52" ry="8" fill="rgba(0,0,0,.35)"/>
+  ${o.cape?'<path d="M20 154 L46 110 L114 110 L140 154 Z" fill="#a82832" stroke="#5a1118" stroke-width="3" stroke-linejoin="round"/>':''}
+  <path d="M42 152 Q44 118 80 116 Q116 118 118 152 Z" fill="#7b5632" stroke="#46301b" stroke-width="3"/>
+  <polygon points="44,84 6,62 40,110" fill="${skin}" stroke="${dark}" stroke-width="4" stroke-linejoin="round"/>
+  <polygon points="116,84 154,62 120,110" fill="${skin}" stroke="${dark}" stroke-width="4" stroke-linejoin="round"/>
+  <ellipse cx="80" cy="84" rx="40" ry="42" fill="${skin}" stroke="${dark}" stroke-width="4"/>
+  <ellipse cx="64" cy="80" rx="9" ry="7" fill="#fff6c8"/><ellipse cx="96" cy="80" rx="9" ry="7" fill="#fff6c8"/>
+  <circle cx="66" cy="81" r="3.5" fill="#c1121f"/><circle cx="94" cy="81" r="3.5" fill="#c1121f"/>
+  <path d="M52 67 L74 76" stroke="${dark}" stroke-width="5" stroke-linecap="round"/><path d="M108 67 L86 76" stroke="${dark}" stroke-width="5" stroke-linecap="round"/>
+  <path d="M80 86 L75 99 L85 99 Z" fill="${dark}" opacity=".6"/>
+  <path d="M60 108 Q80 122 100 108 Z" fill="#3b1d14" stroke="#2b1a10" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M67 110 L72 120 L76 111Z" fill="#fff"/><path d="M93 110 L88 120 L84 111Z" fill="#fff"/>
+  ${o.helmet?'<path d="M39 82 Q36 30 80 30 Q124 30 121 82 L108 70 Q80 58 52 70 Z" fill="#9aa4b6" stroke="#4a5365" stroke-width="4" stroke-linejoin="round"/><rect x="76" y="38" width="8" height="30" rx="2" fill="#7e889b"/>':''}
+  ${o.crown?crown(80,50,1.15):''}</svg>`}
+
+function skeletonSVG(bone,dark,o={}){const sc=o.scale||1,w=Math.round(150*sc),eye=o.eye||'#7cf5ff';
+  return `<svg viewBox="0 0 160 160" width="${w}" height="${w}" role="img" aria-label="骸骨">
+  <ellipse cx="80" cy="150" rx="52" ry="8" fill="rgba(0,0,0,.35)"/>
+  ${o.cape?'<path d="M20 154 L46 110 L114 110 L140 154 Z" fill="#4b2a7a" stroke="#241040" stroke-width="3" stroke-linejoin="round"/>':''}
+  <path d="M48 152 Q50 120 80 116 Q110 120 112 152 Z" fill="${bone}" stroke="${dark}" stroke-width="3"/>
+  <path d="M60 130 H100 M58 141 H102" stroke="${dark}" stroke-width="3" stroke-linecap="round"/>
+  <ellipse cx="80" cy="76" rx="36" ry="38" fill="${bone}" stroke="${dark}" stroke-width="4"/>
+  <rect x="58" y="98" width="44" height="20" rx="6" fill="${bone}" stroke="${dark}" stroke-width="4"/>
+  <path d="M67 99 V117 M76 99 V117 M84 99 V117 M93 99 V117" stroke="${dark}" stroke-width="3"/>
+  <ellipse cx="65" cy="76" rx="10" ry="12" fill="#14162b"/><ellipse cx="95" cy="76" rx="10" ry="12" fill="#14162b"/>
+  <circle cx="65" cy="78" r="3.5" fill="${eye}"/><circle cx="95" cy="78" r="3.5" fill="${eye}"/>
+  <path d="M80 88 L75 98 L85 98 Z" fill="#14162b"/>
+  ${o.helmet?'<path d="M42 76 Q40 26 80 26 Q120 26 118 76 L106 64 Q80 52 54 64 Z" fill="#6b7385" stroke="#2f3544" stroke-width="4" stroke-linejoin="round"/><rect x="76" y="34" width="8" height="28" rx="2" fill="#4f576a"/>':''}
+  ${o.crown?crown(80,44,1.15):''}</svg>`}
+function ghostSVG(o={}){const sc=o.scale||1,w=Math.round(150*sc);
+  return `<svg viewBox="0 0 160 160" width="${w}" height="${w}" role="img" aria-label="ゴースト">
+  <ellipse cx="80" cy="150" rx="46" ry="7" fill="rgba(0,0,0,.25)"/>
+  <path d="M28 142 C18 62 46 22 80 22 C114 22 142 62 132 142 L116 126 L100 144 L80 126 L60 144 L44 126 Z" fill="#e9f0ff" fill-opacity=".93" stroke="#8fa6d6" stroke-width="4" stroke-linejoin="round"/>
+  <ellipse cx="62" cy="76" rx="9" ry="13" fill="#1b2140"/><ellipse cx="98" cy="76" rx="9" ry="13" fill="#1b2140"/>
+  <ellipse cx="80" cy="106" rx="9" ry="12" fill="#1b2140"/></svg>`}
+
+/* ===== 階層 ===== */
+const LAYERS=[
+ {name:'スライムの洞窟',cls:''},
+ {name:'ゴブリンの砦',cls:'l2'},
+ {name:'亡者の墓所',cls:'l3'},
+ {name:'雷鳴の遺跡',cls:'l4'},
+];
+const FLOORS=20;                      // 1段階ぶんの階数。ここを超えるとインフレ（エンドレス）
+const SHOP_AFTER=[2,4,7,9,12,14,17,19];   // この階を突破したあとにお店が開く（20階ごとに繰り返す）
+const shopAfter=f=>SHOP_AFTER.includes(((f-1)%FLOORS)+1);
+const tierOf=i=>Math.floor(i/FLOORS);
+const TIER_PREFIX=['','深層の','最深層の','狂乱の','無限の'];
+const tierPrefix=i=>TIER_PREFIX[Math.min(tierOf(i),TIER_PREFIX.length-1)];
+
+/* ===== 敵データ（HP・攻撃力は階数から自動計算。hm/amは個性の倍率） ===== */
+/* res＝状態異常への強さ（0＝無効／0.5＝耐性＝効果半分、かかる／かからない系は50%で防ぐ／1.5＝弱点＝効果1.5倍）。キー：poison 毒／burn 火傷／bleed 出血／stun スタン／freeze 凍結／weaken 弱体／vulnerable 弱点看破。ボスは無効を持たない。
+   pat の st＝その攻撃でHPにダメージが入ったとき、味方にかかることがある状態異常（poison 毒／stun スタン／weak 弱体／silence 沈黙。js/pstatus.js）。stc でその攻撃のかかる確率を指定できる。
+   spd＝敵の基本の速さ（大きいほど先に動く）。味方の行動の速さは「予約した時の1の目の個数」。実際の速さは、これに「階数÷6（切り捨て）」が足される */
+const ENEMIES=[
+ // 第1層：スライムの洞窟
+ {name:'スライム',spd:0,res:{bleed:0,burn:1.5,freeze:1.5},pat:[{n:'体当たり',m:1}],art:()=>slimeSVG('#5fd38d','#2c7a52')},
+ {name:'ビッグスライム',spd:0,res:{bleed:0,burn:1.5,freeze:1.5},hm:1.1,pat:[{n:'体当たり',m:1},{n:'体当たり',m:1},{n:'のしかかり',m:1.5}],art:()=>slimeSVG('#66b8f0','#2b6aa3',{scale:1.12})},
+ {name:'ポイズンスライム',spd:1,res:{poison:0,bleed:0,burn:1.5,freeze:1.5},pat:[{n:'体当たり',m:1},{n:'毒液',m:1.4,st:'poison'}],art:()=>slimeSVG('#b4d94c','#5a7a1a')},
+ {name:'ゴールドスライム',spd:4,res:{bleed:0,burn:1.5,freeze:1.5},am:.9,goldx:3,pat:[{n:'ぷるぷる震えている',m:0},{n:'体当たり',m:1.3}],art:()=>slimeSVG('#ffd24a','#a87400',{scale:1.05})},
+ {name:'キングスライム',spd:1,res:{bleed:0.5,burn:1.5},boss:true,hm:2.4,am:1.3,pat:[{n:'体当たり',m:1},{n:'体当たり',m:1},{n:'王の圧し潰し',m:1.8}],art:()=>slimeSVG('#b98cf0','#6a3ba8',{crown:true,scale:1.22})},
+ // 第2層：ゴブリンの砦
+ {name:'ゴブリン',spd:1,res:{bleed:1.5},pat:[{n:'こん棒',m:1}],art:()=>goblinSVG('#7fbf4d','#3d6b22')},
+ {name:'ゴブリンアーチャー',spd:3,res:{bleed:1.5},pat:[{n:'矢を放つ',m:1.2},{n:'矢を放つ',m:1.2},{n:'狙いを定めている',m:0},{n:'必中の一矢',m:2}],art:()=>goblinSVG('#9ccf63','#4c7a2b')},
+ {name:'ゴブリンソルジャー',spd:1,res:{bleed:1.5},pat:[{n:'斬りつけ',m:1},{n:'盾を構えている',m:0},{n:'渾身の一撃',m:1.6}],art:()=>goblinSVG('#6aa84a','#335c1f',{helmet:true,scale:1.08})},
+ {name:'ゴブリンシャーマン',spd:2,res:{bleed:1.5,weaken:0.5},pat:[{n:'火の玉',m:1.3},{n:'火の玉',m:1.3},{n:'大火球',m:2,st:'weak'}],art:()=>goblinSVG('#7aa7d9','#2d5a8f',{scale:1.05})},
+ {name:'ゴブリンキング',spd:2,res:{bleed:1.5},boss:true,hm:2.4,am:1.3,pat:[{n:'こん棒',m:1},{n:'こん棒',m:1},{n:'大振り',m:2}],art:()=>goblinSVG('#4f8f3a','#2a5218',{crown:true,cape:true,scale:1.2})},
+ // 第3層：亡者の墓所
+ {name:'スケルトン',spd:1,res:{poison:0,bleed:0,burn:1.5},pat:[{n:'骨の斬撃',m:1}],art:()=>skeletonSVG('#e6e2d2','#6b6552')},
+ {name:'ゴースト',spd:4,res:{poison:0,bleed:0},pat:[{n:'呪いの手',m:1.2},{n:'すり抜けている',m:0},{n:'怨念',m:1.8,st:'silence'}],art:()=>ghostSVG({scale:1.05})},
+ {name:'ガイコツ戦士',spd:1,res:{poison:0,bleed:0,burn:1.5},pat:[{n:'斬撃',m:1},{n:'斬撃',m:1},{n:'大斬り',m:1.8}],art:()=>skeletonSVG('#d8d4c2','#5f5a48',{helmet:true,scale:1.08})},
+ {name:'デスナイト',spd:2,res:{poison:0,bleed:0,burn:1.5},pat:[{n:'暗黒剣',m:1.2},{n:'構えている',m:0},{n:'処刑の一撃',m:2.2}],art:()=>skeletonSVG('#c9c5d8','#4b4668',{helmet:true,cape:true,scale:1.12,eye:'#ff6b6b'})},
+ {name:'リッチ',spd:3,res:{poison:0.5,bleed:0.5,burn:1.5},boss:true,hm:2.4,am:1.3,pat:[{n:'死の光',m:1},{n:'死の光',m:1.2},{n:'滅びの呪文',m:2.2}],art:()=>skeletonSVG('#c9b8f0','#4b2a7a',{crown:true,cape:true,scale:1.2,eye:'#ff7ad9'})},
+ // 第4層：雷鳴の遺跡
+ {name:'ストーンゴーレム',spd:0,res:{poison:0,bleed:0,stun:0.5},hm:1.35,am:1.1,pat:[{n:'岩の拳',m:1.1},{n:'身を固めている',m:0},{n:'地砕き',m:1.7,st:'stun'}],art:()=>skeletonSVG('#b4bdc9','#596575',{helmet:true,scale:1.15,eye:'#8be9ff'})},
+ {name:'雷スライム',spd:3,res:{bleed:0,stun:0,burn:1.5,freeze:1.5},pat:[{n:'放電',m:1.2},{n:'放電',m:1.2},{n:'雷撃',m:1.8,st:'stun'}],art:()=>slimeSVG('#7de7f5','#287d9b',{scale:1.08})},
+ {name:'遺跡の番人',spd:1,res:{poison:0,bleed:0,stun:0.5},hm:1.2,am:1.2,pat:[{n:'槍突き',m:1.2},{n:'盾を構えている',m:0},{n:'雷槍',m:2}],art:()=>goblinSVG('#a9b8c8','#46566c',{helmet:true,cape:true,scale:1.1})},
+ {name:'古代の魔術師',spd:2,hm:1.1,pat:[{n:'雷弾',m:1.3},{n:'魔力を集めている',m:0},{n:'天雷',m:2.1,st:'silence'}],art:()=>ghostSVG({scale:1.18})},
+ {name:'雷竜ヴォルテクス',spd:4,res:{poison:0.5,stun:0.5,freeze:0.5},boss:true,hm:2.8,am:1.45,pat:[{n:'かみつき',m:1.2},{n:'雷の息吹',m:1.6},{n:'轟雷ブレス',m:2.4,st:'stun'}],art:()=>slimeSVG('#ffe16b','#a45c16',{crown:true,cape:true,scale:1.28})},
+];
+const tpl=i=>ENEMIES[i%FLOORS];
+// 敵の強さの伸び方。20階までは g1 の累乗、21階以降は「階ごとの伸び g2 と、20階ごとの段階ジャンプ jump」を CFG.endlessSpeed 乗する
+const growAt=(i,g1,g2,jump)=>i<FLOORS?Math.pow(g1,i):Math.pow(g1,FLOORS-1)*Math.pow(Math.pow(g2,i-FLOORS+1)*Math.pow(jump,tierOf(i)),CFG.endlessSpeed);
+const enemyHp=(i,t)=>Math.round(CFG.hp0*growAt(i,CFG.hpGrow,CFG.hpGrow2,CFG.hpJump)*(t.hm||1));
+const enemyAtk=(i,t)=>Math.max(1,Math.round(CFG.atk0*growAt(i,CFG.atkGrow,CFG.atkGrow2,CFG.atkJump)*(t.am||1)));
+
+/* ===== ダイスの集計 =====
+   ダイスの種類そのもの（名前・目・価格・説明）は data/equipment.xlsx の「ダイス」シートで編集する。
+   ここには、出目の集計（スキルや装備が見る P の中身）と、特殊ダイスの効果計算が入っている。 */
+const R6=[1,2,3,4,5,6];
+/* ===== ダイスの集計（スキルはこれを見て威力が決まる） ===== */
+const matchBonus=(M,jack)=>{const b=M<=1?1:M===2?1.3:M===3?1.6:M===4?2:2+0.5*(M-4);return jack?Math.max(b*1.5,3):b};   // 揃いボーナスに上限なし（5個以上は1個ごとに+0.5）
+function pool(){
+  const cnt={};let S=0,sumHigh=0,sumOdd=0,odd=0,high=0,even=0;
+  for(const d of p.dice){
+    cnt[d.v]=(cnt[d.v]||0)+1;
+    const w=d.v*(d.t==='fire'?2:d.t==='ice'&&d.v<=3?2:d.t==='thunder'&&d.v%2===0?2:d.t==='poison'&&d.v%2===1?2:1);
+    S+=w;
+    if(d.v>=4){sumHigh+=w;high++}
+    if(d.v%2===1){sumOdd+=w;odd++}else even++;
+  }
+  const faces=Object.keys(cnt).map(Number).sort((a,b)=>a-b);
+  let M=0;faces.forEach(f=>{M=Math.max(M,cnt[f])});
+  const N=p.dice.length,jack=N>=3&&faces.length===1;
+  let run=0,best=0,prev=null;
+  faces.forEach(f=>{run=(prev!==null&&f===prev+1)?run+1:1;best=Math.max(best,run);prev=f});
+  const pairs=faces.filter(f=>cnt[f]>=2).length;
+  const eqs=p.equip?equipped():[];
+  const sm=eqs.reduce((m,it)=>m*(it.sumMul||1),1);
+  let mult=matchBonus(M,jack);
+  if(eqs.some(it=>it.matchPow))mult=+(mult*mult).toFixed(2);
+  return {cnt,S:R(S*sm),N,M,mult,jack,run:best,pairs,high,sumHigh:R(sumHigh*sm),odd,sumOdd:R(sumOdd*sm),even};
+}
+const tallyText=()=>{const P=pool();return Object.keys(P.cnt).map(Number).sort((a,b)=>a-b).map(f=>`${f}×${P.cnt[f]}`).join(' ')};
+
+/* ===== 目の役割 =====
+   サイコロの目（1〜6）には、それぞれ役割がある。最終的に出ている目の「個数」が多いほど、その役割が強くなる。
+   役割の名前・アイコン・説明・効果の大きさは data/equipment.xlsx の「目の役割」シートで編集する（シートがなければ下の初期値）。
+   キープできる目は1種類だけなので、「どの目を伸ばすか」が、そのまま「どの役割を伸ばすか」になる。
+     1 速さ …… 1の目の個数が、行動の速さになる。さらに振り直し回数・行動回数も増える（効果量1＝何個ごとに振り直し+1／効果量2＝何個ごとに行動回数+1／効果量3＝1の目1個あたりの行動の速さ）
+     2 耐久 …… 受けるダメージが減り、敵の状態異常にもかかりにくくなる（効果量1＝1個あたりの軽減の強さ。被ダメージ＝1÷(1＋2の個数×効果量1)／効果量2＝1個あたりの状態異常の抵抗。かかる確率＝1÷(1＋2の個数×効果量2)。「行動を実行」を押した時点の出目で決まる）
+     3 会心 …… 攻撃が会心（大ダメージ）になりやすい（効果量1＝1個あたりの会心率／効果量2＝会心時のダメージ倍率。行動を予約した時点の出目で決まる）
+     4 魔力 …… 魔法の目。魔法スキルは、すべて4の目が条件。行動の実行前にMP回復、魔法のダメージ増（効果量1＝1個あたりのMP／効果量2＝1個あたりの魔法ダメージ増）
+     5 技巧 …… 状態異常が強くなる（効果量1＝1個あたりの強さ増。毒・火傷・出血のダメージ、弱体の軽減、弱点看破の倍率）。装備の付与確率も上がる（効果量2＝1個あたりの確率増）。毒・火傷・出血の継続ターンが延びる（効果量3＝何個ごとに+1ターン）
+     6 攻撃 …… 与えるダメージが増える（効果量1＝1個あたりのダメージ増） */
+const ROLE_DEFAULT={
+  1:{name:'速さ',icon:'⚡',desc:'1の目の個数が、行動の速さになる。さらに、振り直しと行動回数も増える。',a:3,b:6,c:1},
+  2:{name:'耐久',icon:'🛡',desc:'2の目の個数に応じて、受けるダメージが減り、敵の状態異常にもかかりにくくなる。',a:0.06,b:0.08},
+  3:{name:'会心',icon:'💥',desc:'3の目の個数に応じて、攻撃が会心（大ダメージ）になりやすい。',a:0.04,b:2},
+  4:{name:'魔力',icon:'🔮',desc:'魔法の目。行動の実行前にMPが回復し、魔法のダメージが増える。魔法スキルは、すべて4の目が条件。',a:0.5,b:0.06},
+  5:{name:'技巧',icon:'🎯',desc:'状態異常（毒・火傷・出血・弱体・弱点看破）が強くなり、毒・火傷・出血は続く期間（ターン／回数）も延びる。装備の付与確率も上がる。',a:0.06,b:0.02,c:3},
+  6:{name:'攻撃',icon:'⚔️',desc:'6の目の個数に応じて、与えるダメージが増える。',a:0.05,b:0},
+};
+let ROLE=ROLE_DEFAULT;
+const roleCnt=(P,f)=>(P&&P.cnt&&P.cnt[f])||0;
+const roleUse=(f)=>ROLE[f]||null;
+
+function roleRerollBonus(P){const r=roleUse(1);return r&&r.a>0?Math.floor(roleCnt(P,1)/r.a):0}
+function roleSpeedBonus(P){const r=roleUse(1);return r&&r.c>0?Math.floor(roleCnt(P,1)*r.c):0}   // 1の目の個数×効果量3＝行動の速さ
+function roleActionBonus(P){const r=roleUse(1);return r&&r.b>0?Math.floor(roleCnt(P,1)/r.b):0}
+function roleTakeMul(P){const r=roleUse(2);return r&&r.a>0?1/(1+roleCnt(P,2)*r.a):1}   // 耐久（2）：被ダメージの倍率
+function roleStatusResistMul(P){const r=roleUse(2);return r&&r.b>0?1/(1+roleCnt(P,2)*r.b):1}   // 耐久（2）：敵の状態異常にかかる確率の倍率
+function roleCritChance(P){const r=roleUse(3);return r&&r.a>0?Math.min(0.9,roleCnt(P,3)*r.a):0}   // 会心（3）：会心率
+const roleCritMul=()=>{const r=roleUse(3);return r&&r.b>1?r.b:2};
+function roleMana(P){const r=roleUse(4),c=roleCnt(P,4);return r&&r.a>0?Math.floor(c*r.a):0}
+function roleMagMul(P){const r=roleUse(4);return r&&r.b>0?1+roleCnt(P,4)*r.b:1}
+function roleStatusMul(P){const r=roleUse(5);return r&&r.a>0?1+roleCnt(P,5)*r.a:1}
+function roleStatusDuration(P){const r=roleUse(5);return r&&r.c>0?Math.floor(roleCnt(P,5)/r.c):0}   // 毒・火傷・出血の継続ターン+
+function roleWeakMul(P){const r=roleUse(5);return r&&r.a>0?0.5/(1+roleCnt(P,5)*r.a):0.5}   // 弱体：敵の次の攻撃の倍率（基本0.5）
+function roleVulnMul(P){const r=roleUse(5);return r&&r.a>0?1.5+roleCnt(P,5)*r.a*0.5:1.5}   // 弱点看破：次に受けるダメージの倍率（基本1.5）
+function roleChanceBonus(P){const r=roleUse(5);return r&&r.b>0?roleCnt(P,5)*r.b:0}
+function roleAtkMul(P){const r=roleUse(6);return r&&r.a>0?1+roleCnt(P,6)*r.a:1}
+
+// いまの出目で働いている役割の一覧（画面に出す）
+function roleSummary(P){
+  const out=[],t=(f,s)=>out.push(`${ROLE[f].icon}${ROLE[f].name} ${s}`);
+  if(roleUse(1)){const a=roleRerollBonus(P),b=roleActionBonus(P),c=roleSpeedBonus(P);if(a||b||c)t(1,[a?`振り直し+${a}`:'',b?`行動+${b}`:'',c?`速さ+${c}`:''].filter(Boolean).join('・'))}
+  if(roleUse(2)){const m=roleTakeMul(P),q=roleStatusResistMul(P);if(m<1)t(2,`被ダメージ×${fmtM(+m.toFixed(2))}${q<1?`・状態異常率×${fmtM(+q.toFixed(2))}`:''}`)}
+  if(roleUse(3)){const c=roleCritChance(P);if(c>0)t(3,`会心${Math.round(c*100)}%（×${fmtM(roleCritMul())}）`)}
+  if(roleUse(4)){const m=roleMana(P),g=roleMagMul(P);if(m>0||g>1)t(4,[m?`MP+${m}`:'',g>1?`魔法×${fmtM(g)}`:''].filter(Boolean).join('・'))}
+  if(roleUse(5)){const m=roleStatusMul(P),d=roleStatusDuration(P),c=roleChanceBonus(P),v=roleVulnMul(P);const parts=[m>1?`状態異常×${fmtM(m)}`:'',d>0?`継続+${d}`:'',c>0?`付与率+${Math.round(c*100)}%`:'',v>1.5?`弱点×${fmtM(+v.toFixed(2))}`:''].filter(Boolean);if(parts.length)t(5,parts.join('・'))}
+  if(roleUse(6)){const a=roleAtkMul(P);if(a>1)t(6,`ダメージ×${fmtM(a)}`)}
+  return out;
+}
+
+/* ===== 速さと行動順 =====
+   1ターンの流れ：サイコロを振る（振り直し） → 行動ボタンを押して「予約」する（最大 p.actions 個）→ 「行動を実行」。
+   ・行動を予約した瞬間の出目が、その行動の能力になる（速さも、ダメージなどの威力も）。
+     予約したあとで振り直しても、予約済みの行動は、予約した時の出目のまま。
+   ・行動の速さ ＝ 1の目の個数 × 目の役割の効果量3（初期値1） ＋ 装備の「行動の速さ+」。
+   ・実行は、味方の予約した行動と敵の1回の行動を「速さの大きい順」に並べて行う（同じ速さなら味方が先、味方同士は予約した順）。
+   ・敵の速さ ＝ 敵の種類ごとの基本値（enemies.js の spd）＋ 階数÷CFG.enemySpeedStep（切り捨て）。 */
+const enemySpeed=(i,t)=>(t.spd===undefined?1:t.spd)+Math.floor(i/CFG.enemySpeedStep);
+const actionSpeed=P=>roleSpeedBonus(P)+equipped().reduce((n,it)=>n+(it.speedBonus||0),0);
+
+// 予約した行動＋敵 を、速さの順に並べる
+function planTimeline(){
+  const ev=p.queue.map((q,i)=>({who:'p',q,id:q.id,spd:q.spd,slot:i}));
+  ev.push({who:'e',spd:e.spd,slot:99});
+  ev.sort((a,b)=>(b.spd-a.spd)||(a.who===b.who?a.slot-b.slot:(a.who==='p'?-1:1)));
+  return ev;
+}
+const mpCost=a=>Math.max(0,(a.mp||0)-equipped().reduce((n,it)=>n+(it.mpDiscount||0),0));
+const reservedMp=()=>p.queue.reduce((n,q)=>n+mpCost(ALL[q.id]),0);
+
+function timelineHTML(){
+  const free=Math.max(0,p.actions-p.queue.length);
+  const chips=planTimeline().map(x=>{
+    if(x.who==='e')return `<span class="tlc en">👹 ${escHtml(e.name)} 速さ<b>${x.spd}</b></span>`;
+    const a=ALL[x.id],r=a.calc(x.q.P);
+    const dm=r.dmg?` 約${fmt(previewFinal(r.dmg,x.q.P,a))}`:'';
+    return `<button class="tlc q" data-q="${x.slot}" title="タップで予約を取り消す">${escHtml(a.name)} 速さ<b>${x.spd}</b>${dm}</button>`;
+  }).join('<i class="tla">›</i>');
+  return `<div class="grp">行動の順番（速さの大きい順・あと${free}回予約できる）</div><div class="tl">${chips}</div>`+
+    (p.queue.length?'':'<div class="sub tlhint">行動ボタンを押すと、いまの出目で予約されます。予約したあとで振り直しても、予約は変わりません。</div>');
+}
+
+// --- 予約 ---
+function syncQueue(){p.actionsUsed=p.queue.length;syncRoleBonuses()}
+function queueAction(a){
+  if(p.queue.length>=p.actions)return;
+  const P=pool();   // いまの出目を、この行動の能力として記録する
+  p.queue.push({id:a.id,P,spd:actionSpeed(P)});p.used[a.id]=true;syncQueue();render();
+}
+function unqueue(slot){
+  const q=p.queue[slot];if(!q)return;
+  p.queue.splice(slot,1);p.used[q.id]=false;syncQueue();render();
+}
+function clearQueue(){
+  for(const q of p.queue)p.used[q.id]=false;
+  p.queue=[];p.actionsUsed=0;
+}
+
+// --- 実行 ---
+async function doAction(q,no,total){
+  const a=ALL[q.id],P=q.P,r=a.calc(P),cost=mpCost(a);
+  if(!r.ok||p.mp<cost){
+    const why=!r.ok?(r.needText||a.need||'条件を満たさない'):'MPが足りない';
+    rec(`【行動${no}/${total}】${a.name}は不発（${why}）`,'act');log(`${a.name}は不発！（${why}）`);render();await sleep(380);return;
+  }
+  p.mp-=cost;
+  if(a.cd){const w=Math.max(0,a.cd-(has('haste')?1:0)-equipped().reduce((n,it)=>n+(it.cooldownReduce||0),0));if(w>0){p.cds[a.id]=w;p.cdFresh[a.id]=true;rec(`　${a.name}は${w}ターン使えなくなる`,'act')}}
+  p.currentSkill=a.id;
+  rec(`【行動${no}/${total}】${a.name}（速さ${q.spd}）${a.mp?`（MP${a.mp}消費）`:''}`,'act');
+  rec(`　予約した時の出目：合計${fmt(P.S)}／最多${P.M}個／揃い×${fmtM(P.mult)}／ペア${P.pairs}組`,'act');
+  log(`${a.name}！`,true);render();await sleep(220);
+  await apply(r,P);
+}
+// 敵の番：状態異常のダメージ → 敵の行動
+async function enemyTurn(){
+  for(const [key,label] of [['poison','毒'],['burn','火傷']]){   // 出血は、時間ではなく「ダメージを受けるたび」に入る（main.js の bleedTrigger）
+    const st=e[key];if(!st)continue;const wound=key==='poison'&&!!e.bleed,d=key==='poison'?Math.max(1,R(e.maxHp*st.pct*(wound?CFG.comboWound:1))):st.d;   // コンボ：重症（毒＋出血）
+    if(wound)log(`💥重症！毒のダメージが×${CFG.comboWound}`,true);e.hp=Math.max(0,e.hp-d);st.t--;if(st.t<=0)e[key]=null;
+    rec(`【${label}】${e.name}に${label}ダメージ${d}`,'take');log(`${label}で${e.name}に${d}のダメージ！`,true);popup('scene',d,'dmg');render();await sleep(350);
+    if(e.hp<=0)return;
+  }
+  await enemyAct();
+}
+async function runTimeline(){
+  busy=true;
+  const ev=planTimeline(),total=ev.filter(x=>x.who==='p').length;
+  p.actionsLeft=0;p.execP=pool();render();await sleep(250);   // 耐久(2)・魔力(4)の目は、実行を押した時点の出目で決まる
+  await roleTurnEnd();
+  rec(`【行動順】${ev.map(x=>x.who==='e'?`敵(${x.spd})`:`${ALL[x.id].name}(${x.spd})`).join(' → ')}`,'act');
+  let n=0;
+  for(const x of ev){
+    if(x.who==='p'){
+      n++;await doAction(x.q,n,total);
+      p.currentSkill=null;
+      if(e.hp<=0){endTurnCd();await win();return}
+    }else{
+      await enemyTurn();
+      if(p.hp<=0){await lose();return}
+      if(e.hp<=0){endTurnCd();await win();return}
+    }
+  }
+  await pstRoundEnd();   // 毒のダメージ／スタン・弱体・沈黙を、次のラウンドへ
+  if(p.hp<=0){await lose();return}
+  if(has('regen')&&p.hp<p.maxHp){const h=Math.max(1,R(p.maxHp*.03));p.hp=Math.min(p.maxHp,p.hp+h);popup('pl','+'+h,'heal')}
+  p.shield=0;
+  endTurnCd();
+  await startTurn();
+  busy=false;render();
+}
+
+/* ===== 味方がかかる状態異常 =====
+   敵の攻撃で「HPにダメージが入ったとき」に、その攻撃に設定された状態異常（enemies.js の pat の st）がかかることがある。
+   シールドやバリアで完全に防いだときは、かからない。かかる確率は CFG.pstChance（ボスは pstChanceBoss）で、
+   2の目（耐久）の個数が多いほど、かかりにくくなる。戦闘が終わると、すべて消える。
+     🧪毒 …… 3ターン、ラウンドの終わりに、最大HPの CFG.pstPoisonPct のダメージ
+     💫スタン …… 次のラウンド、行動回数が1回減る
+     🥀弱体 …… 次のラウンド、与えるダメージが CFG.pstWeakMul 倍
+     🔇沈黙 …… 次のラウンド、魔法が使えない
+   p.st … いま効いている状態／ p.stNext … 敵の行動で受けた、次のラウンドから効く状態 */
+const PST={poison:{name:'毒',icon:'🧪'},stun:{name:'スタン',icon:'💫'},weak:{name:'弱体',icon:'🥀'},silence:{name:'沈黙',icon:'🔇'}};
+const newPst=()=>({poison:null,stun:0,weak:0,silence:0});
+const newPstNext=()=>({stun:0,weak:0,silence:0});
+function pstReset(){p.st=newPst();p.stNext=newPstNext()}
+const pstChance=a=>Math.min(0.95,(a.stc!==undefined?a.stc:(e.boss?CFG.pstChanceBoss:CFG.pstChance))*roleStatusResistMul(p.execP||pool()));
+
+// 敵の攻撃でHPにダメージが入ったあとに呼ぶ
+function pstTry(a){
+  if(!a||!a.st||!PST[a.st])return;
+  const c=pstChance(a);
+  if(!(Math.random()<c)){rec(`　${PST[a.st].name}は、かからなかった`,'take');return}
+  pstInflict(a.st);
+}
+function pstInflict(kind){
+  if(kind==='poison')p.st.poison={pct:CFG.pstPoisonPct,t:3};
+  else p.stNext[kind]=1;
+  const txt=kind==='poison'?`（ラウンドの終わりに、最大HPの${fmtM(+(CFG.pstPoisonPct*100).toFixed(1))}%）`:'（次のラウンド）';
+  rec(`　${PST[kind].icon}${PST[kind].name}を受けた`,'take');log(`${PST[kind].icon}${PST[kind].name}を受けた！${txt}`,true);popup('pl',PST[kind].name,'hurt');
+}
+// ラウンドの終わり：毒のダメージ → 「次のラウンドから効く状態」を「いま効いている状態」に入れ替える
+async function pstRoundEnd(){
+  const st=p.st;
+  if(st.poison){
+    const d=Math.max(1,R(p.maxHp*st.poison.pct));p.hp=Math.max(0,p.hp-d);st.poison.t--;if(st.poison.t<=0)st.poison=null;
+    rec(`【毒】勇者に毒ダメージ${fmt(d)}`,'take');log(`毒で${fmt(d)}のダメージ！`,true);popup('pl','-'+fmt(d),'hurt');render();await sleep(350);
+  }
+  st.stun=p.stNext.stun;st.weak=p.stNext.weak;st.silence=p.stNext.silence;p.stNext=newPstNext();
+}
+function pstChips(){
+  if(!p||!p.st)return '';
+  const out=[],st=p.st,nx=p.stNext||{};
+  if(st.poison)out.push(`${PST.poison.icon}毒 ${fmtM(+(st.poison.pct*100).toFixed(1))}%×${st.poison.t}`);
+  if(st.stun)out.push(`${PST.stun.icon}スタン（行動-1）`);
+  if(st.weak)out.push(`${PST.weak.icon}弱体（ダメージ×${CFG.pstWeakMul}）`);
+  if(st.silence)out.push(`${PST.silence.icon}沈黙（魔法不可）`);
+  for(const k of ['stun','weak','silence'])if(nx[k])out.push(`次：${PST[k].icon}${PST[k].name}`);
+  return out.map(t=>`<span class="chip">${t}</span>`).join('');
+}
+
+/* ===== 装備のしくみ =====
+   装備の名前・価格・説明・数値は data/equipment.xlsx、効果のプログラムは js/equipment_fx.js。
+   ここには、枠・装着・発動順・ダメージ計算の流れ（装備が上から順に発動する処理）が入っている。 */
+/* ===== 装備：出目に反応して、上から順に発動する ===== */
+const SLOT_NAME={weapon:'武器',armor:'防具',acc:'アクセ'};
+const SLOT_ORDER=['weapon','armor','acc'];
+const SLOT_TYPE={weapon:'武器',armor:'防具',acc:'アクセ'};
+const baseSlots=()=>[{t:'weapon',id:null},{t:'armor',id:null},{t:'acc',id:null},{t:'acc',id:null}];
+const equipped=()=>p.equip.filter(x=>x.id).map(x=>ITEM_BY[x.id]);
+const ownedItem=id=>p.equip.some(x=>x.id===id);
+function growSlots(){
+  for(const t of SLOT_ORDER)p.equip.push({t,id:null});   // 増えた枠は一番下に追加（並び替えは自由）
+}
+function moveSlot(code){
+  const [i,dir]=String(code).split(':');const k=+i,j=dir==='up'?k-1:k+1;
+  if(!(k>=0&&k<p.equip.length)||j<0||j>=p.equip.length)return false;
+  const a=p.equip[k],b=p.equip[j];
+  p.equip[k]=b;p.equip[j]=a;
+  rec(`【装備の並び替え】${a.id?ITEM_BY[a.id].name:'空き枠'}を${dir==='up'?'上':'下'}へ移動`,'s');
+  return true;
+}
+const itemOpt=it=>({id:'i_'+it.id,name:it.name,tag:`装備・${SLOT_TYPE[it.slot]}${it.leg?'・伝説':it.rare?'・レア':''}`,desc:it.desc,cls:it.leg?'legend':'',apply:()=>equipItem(it,false)});
+const takeMul=()=>equipped().reduce((m,it)=>m*(it.take?it.take():1),1);
+
+function runPipeline(base,P,preview,sk){
+  let v=base;const steps=[];
+  const skillId=p.currentSkill||'';
+  const skillBoost=equipped().reduce((m,it)=>m*((it.skillMul&&it.skillMul[skillId])||1),1);
+  if(skillBoost!==1){v=cl(v*skillBoost);steps.push({id:null,name:'スキル強化',msg:skillId,t:`×${skillBoost}`,v:R(v)})}
+  for(const it of equipped()){
+    if(!it.dmg)continue;
+    const r=it.dmg(P);if(!r)continue;
+    let t='';
+    if(r.add){v=cl(v+r.add);t=`+${fmt(R(r.add))}`}
+    if(r.mul){v=cl(v*r.mul);t=`×${fmtM(r.mul)}`}
+    if(r.rand){
+      const m=preview?(r.rand[0]+r.rand[1])/2:+(r.rand[0]+Math.random()*(r.rand[1]-r.rand[0])).toFixed(1);
+      v=cl(v*m);t=`×${m}`;
+    }
+    steps.push({id:it.id,name:it.name,msg:r.msg,t,v:R(v)});
+  }
+  const rm=roleAtkMul(P)*(((sk||ALL[skillId])||{}).type==='mag'?roleMagMul(P):1);   // 目の役割：攻撃（6）・魔力（4）
+  if(rm!==1){v=cl(v*rm);steps.push({id:null,name:'目の役割',msg:`${roleCnt(P,6)?`${ROLE[6].icon}${roleCnt(P,6)}個`:''}${roleMagMul(P)>1&&((sk||ALL[skillId])||{}).type==='mag'?` ${ROLE[4].icon}${roleCnt(P,4)}個`:''}`.trim(),t:`×${fmtM(rm)}`,v:R(v)})}
+  if(p.st&&p.st.weak){v=cl(v*CFG.pstWeakMul);steps.push({id:null,name:'弱体',msg:'🥀弱体中',t:`×${CFG.pstWeakMul}`,v:R(v)})}   // 敵に弱体させられている
+  if(has('power')){v=cl(v*1.2);steps.push({id:null,name:'闘志',msg:'',t:'×1.2',v:R(v)})}
+  if(p.dbl){v=cl(v*2);steps.push({id:null,name:'ダブルアップ',msg:'',t:'×2',v:R(v)})}
+  return {base:R(base),steps,final:Math.max(1,R(cl(v)))};
+}
+const previewFinal=(base,P,sk)=>runPipeline(base,P,true,sk).final;
+function guardFinal(base,P){
+  let v=base;const steps=[];
+  for(const it of equipped()){
+    if(!it.sh)continue;
+    const r=it.sh(P);if(!r)continue;
+    v=cl(v+r.add);steps.push({id:it.id,name:it.name,msg:r.msg,t:`+${fmt(R(r.add))}`,v:R(v)});
+  }
+  return {base:R(base),steps,final:Math.max(1,R(v))};
+}
+async function cascade(res,note){
+  const c=$('#casc'),bs=$('#bigscore');
+  rec(`　${note||'基本'}＝${res.base}`,'act');
+  c.innerHTML=`<div class="cl">${note||'基本'}<em>${fmt(res.base)}</em></div>`;
+  bs.textContent=fmt(res.base);retrigger(bs,'pulse');
+  await sleep(res.steps.length?240:120);
+  for(const s of res.steps){
+    p.hot=s.id;render();
+    rec(`　${s.name}${s.msg?'（'+s.msg+'）':''} ${s.t} → ${s.v}`,'act');
+    c.innerHTML+=`<div class="cl"><b>${s.name}</b> ${s.msg||''} ${s.t}<em>→ ${fmt(s.v)}</em></div>`;
+    bs.textContent=fmt(s.v);retrigger(bs,'pulse');
+    await sleep(260);
+  }
+  p.hot=null;render();
+  rec(`　▶ 最終値 ${fmt(res.final)}`,'act');
+  await sleep(res.steps.length?220:80);
+  bs.textContent='';c.innerHTML='';
+}
+async function turnStartItems(){
+  const P=pool();
+  for(const it of equipped()){
+    if(!it.turn)continue;
+    const r=it.turn(P);if(!r)continue;
+    p.hot=it.id;
+    if(r.shield){const sh=R(r.shield*equipped().reduce((m,x)=>m*(x.shieldMul||1),1));p.shield+=sh;log(`${it.name}：${r.msg} → シールド+${sh}`);popup('pl','+'+sh,'heal')}
+    if(r.heal){log(`${it.name}：${r.msg} → HP+${r.heal}`);healP(r.heal)}
+    if(r.mp){p.mp=Math.min(p.maxMp,p.mp+r.mp);log(`${it.name}：${r.msg} → MP+${r.mp}`)}
+    render();await sleep(320);
+    p.hot=null;
+  }
+  render();
+}
+function slotRows(){
+  return p.equip.map((x,i)=>({nm:`${i+1}. ${SLOT_NAME[x.t]}`,it:x.id?ITEM_BY[x.id]:null,x,i}));
+}
+const mvBtns=(i,mode)=>`<span class="mv"><button class="mvb" ${mode==='shop'?`data-i="mv:${i}:up"`:`data-mv="${i}:up"`} ${i===0?'disabled':''} aria-label="上へ">▲</button><button class="mvb" ${mode==='shop'?`data-i="mv:${i}:down"`:`data-mv="${i}:down"`} ${i===p.equip.length-1?'disabled':''} aria-label="下へ">▼</button></span>`;
+function equipHTML(){
+  const tot={weapon:0,armor:0,acc:0};p.equip.forEach(x=>{tot[x.t]++});
+  return `<div class="eqh">装備（上から順に発動。▲▼で並び替え）　枠：武器${tot.weapon}／防具${tot.armor}／アクセ${tot.acc}</div>`+slotRows().map(r=>
+    `<div class="eq ${r.it&&p.hot===r.it.id?'hot':''} ${r.it&&r.it.leg?'leg':''}"><span class="es">${r.nm}</span>${r.it?`<b>${r.it.name}</b>`:`<b class="none">（空き）</b>`}${mvBtns(r.i,'play')}${r.it?`<span class="ed">${r.it.desc}</span>`:''}</div>`).join('');
+}
+async function equipItem(it,paid){
+  const mine=p.equip.filter(x=>x.t===it.slot);
+  let slot=mine.find(x=>!x.id);
+  const half=Math.round(it.price/2);
+  if(!slot){
+    const opts=mine.map((x,i)=>{const old=ITEM_BY[x.id];return {x,name:`${old.name}と入れ替える`,tag:SLOT_NAME[it.slot]+(mine.length>1?(i+1):''),desc:`${old.desc}（外した装備は${Math.round(old.price/2)}Gで売却）`,cls:old.leg?'legend':''}});
+    opts.push({x:null,name:'見送る',tag:'',desc:paid?`${it.name}は買わない（代金は戻る）`:`${it.name}は受け取らない（${half}Gになる）`});
+    const o=await pick(`${it.name}を装備する？`,`${it.desc}`,opts);
+    if(!o.x){if(!paid){p.gold+=half;log(`${it.name}を見送り、${half}Gを得た。`)}return false}
+    p.gold+=Math.round(ITEM_BY[o.x.id].price/2);
+    slot=o.x;
+  }
+  slot.id=it.id;log(`${it.name}を装備した！`);
+  return true;
+}
+
+/* ===== 攻撃時の状態異常 =====
+   装備シートの「攻撃時の状態異常」に 毒・火傷・出血・スタン・凍結・弱体・弱点看破 のどれかを書くと、
+   その装備を付けているあいだ、攻撃でダメージを与えるたびに敵へ付与する（プログラムの追加は不要）。
+   毒・火傷・出血の強さ ＝ 与えたダメージ × 「状態異常の強さ」を、3ターンのあいだ毎ターン与える。
+   付与確率が空なら100%。 */
+const STATUS_LABEL={poison:'毒',burn:'火傷',bleed:'出血',stun:'スタン',freeze:'凍結',weaken:'弱体',vulnerable:'弱点看破'};
+const STATUS_DOT={poison:1,burn:1,bleed:1};
+function itemStatusOnHit(dealt,P){
+  if(!(dealt>0)||!e||e.hp<=0)return;
+  const rs={};
+  for(const it of equipped()){
+    const k=it.statusOnHit;if(!k)continue;
+    const chance=Math.min(1,(it.statusChance===undefined?1:it.statusChance)+(it.statusChance===undefined?0:roleChanceBonus(P||pool())));   // 技巧（5）の目で付与確率アップ
+    if(!(Math.random()<chance))continue;
+    if(k==='poison'){const pow=it.statusPower===undefined?0.005:it.statusPower;rs.poison=Math.max(rs.poison||0,pow)}   // 毒だけ：敵の最大HPに対する割合（0.01＝1%）
+    else if(STATUS_DOT[k]){const pow=it.statusPower===undefined?0.15:it.statusPower;rs[k]=Math.max(rs[k]||0,pow)}   // 火傷・出血：与えたダメージに対する割合
+    else rs[k]=true;
+    rec(`　${it.name}：攻撃時に${STATUS_LABEL[k]}`,'act');
+  }
+  if(Object.keys(rs).length)applyStatuses(rs,true,P,dealt);
+}
+
+/* ===== 装備ごとの効果プログラム =====
+   名前・価格・説明・倍率や回数などの数値は data/equipment.xlsx で編集する。ここには「何が起きるか」の処理だけを書く。
+   キーは data/equipment.xlsx の ID と対応している（IDを変えると効果が外れる）。
+   dmg(P)        …ダメージ計算のとき。{add:加算} {mul:倍率} {rand:[最小,最大]} を返す
+   sh(P)         …ぼうぎょ（シールド）のとき
+   turn(P)       …ターン開始時。{shield} {heal} {mp} {gold} などを返す
+   take()        …受けるダメージの倍率（0.88 なら12%減）
+   reflect(d)    …受けたダメージdに対する反射ダメージ
+   onWin / onWinHeal …勝利時にもらえるゴールド / 回復量
+   hit / onTaken / battleStart …被弾時・被弾後・戦闘開始時 */
+const ITEM_FX={
+ sword:{
+  dmg:P=>{const n=P.cnt[1]||0;return n?{add:n*2*P.N,msg:`1の目×${n}`}:null},
+ },
+ axe:{
+  dmg:P=>{const n=P.cnt[6]||0;return n?{add:n*3*P.N,msg:`6の目×${n}`}:null},
+ },
+ twin:{
+  dmg:P=>P.pairs?{add:R(P.pairs*2.5*P.N),msg:`ペア×${P.pairs}`}:null,
+ },
+ fang:{
+  dmg:P=>e.hp<=e.maxHp/2?{mul:1.4,msg:'敵HP半分以下'}:null,
+ },
+ gambler:{
+  dmg:P=>({rand:[0.5,2.5],msg:'賭け'}),
+ },
+ shield:{
+  sh:P=>P.sumOdd?{add:P.sumOdd,msg:'奇数の合計'}:null,
+ },
+ chain:{
+  turn:P=>P.even?{shield:P.even*Math.max(1,R(P.N/2)),msg:`偶数×${P.even}`}:null,
+ },
+ fury:{
+  dmg:P=>p.hp<=p.maxHp/2?{mul:1.4,msg:'HP半分以下'}:null,
+ },
+ plate:{
+  take:()=>0.88,
+ },
+ thorn:{
+  reflect:d=>R(d*.4),
+ },
+ bulwark:{
+  dmg:P=>p.bank>0?{add:R(p.bank),msg:'防いだ分'}:null,
+ },
+ ward:{
+  turn:P=>({shield:P.N*2,msg:`ダイス${P.N}個`}),
+ },
+ grit:{
+  take:()=>p.hp<=p.maxHp/2?0.7:1,
+ },
+ vamp:{
+  hit:d=>({heal:Math.max(1,R(d*.06))}),
+ },
+ ring:{
+  dmg:P=>{const n=P.cnt[4]||0;return n?{add:R(n*1.5*P.N),msg:`4の目×${n}`}:null},
+ },
+ scale:{
+  dmg:P=>P.even>=4?{mul:1.3,msg:`偶数×${P.even}`}:null,
+ },
+ wallet:{
+  dmg:P=>{const n=Math.floor(p.gold/10);return n?{add:n*2,msg:`${p.gold}G`}:null},
+ },
+ amulet:{
+  turn:P=>{const n=P.cnt[6]||0;return n?{heal:Math.max(1,R(p.maxHp*.02*n)),msg:`6の目×${n}`}:null},
+ },
+ orb:{
+  dmg:P=>{const f=[...p.locked][0];const n=f?(P.cnt[f]||0):0;return n?{add:n*2*P.N,msg:`キープ×${n}`}:null},
+ },
+ crest:{
+  dmg:P=>p.rerollsUsed?{add:p.rerollsUsed*2*P.N,msg:`振り直し×${p.rerollsUsed}`}:null,
+ },
+ sixlord:{
+  dmg:P=>(P.cnt[6]||0)>=3?{mul:2,msg:`6の目×${P.cnt[6]}`}:null,
+ },
+ evenking:{
+  dmg:P=>(P.N>=3&&P.even===P.N)?{mul:2.5,msg:'全部偶数'}:null,
+ },
+ shatter:{
+  dmg:P=>(p.shield+p.barrier)>0?{add:p.shield+p.barrier,msg:'守りの力'}:null,
+ },
+ goldmine:{
+  onWin:()=>Math.round(p.gold*.1),
+ },
+ greed:{
+  dmg:P=>{const n=Math.floor(p.gold/100);return n?{mul:+Math.pow(1.05,n).toFixed(2),msg:`${fmt(p.gold)}G`}:null},
+ },
+ echo2:{
+  dmg:P=>P.M>=4?{mul:1.5,msg:`最多${P.M}個`}:null,
+ },
+ ones:{
+  dmg:P=>(P.cnt[1]||0)>=3?{mul:2,msg:`1の目×${P.cnt[1]}`}:null,
+ },
+ frostblade:{
+  dmg:P=>{const n=[1,2,3].reduce((a,f)=>a+(P.cnt[f]||0),0);return n?{add:n*2*P.N,msg:`低い目×${n}`}:null},
+ },
+ stormaxe:{
+  dmg:P=>P.even>=3?{mul:1.6,msg:`偶数×${P.even}`}:null,
+ },
+ venomedge:{
+  dmg:P=>P.odd>=3?{mul:1.35,msg:`奇数×${P.odd}`}:null,
+ },
+ highcrown:{
+  dmg:P=>{const n=Object.keys(P.cnt).map(Number).filter(f=>f>=5).reduce((a,f)=>a+P.cnt[f],0);return n?{add:R(n*1.5*P.N),msg:`5以上×${n}`}:null},
+ },
+ heartstone:{
+  turn:P=>({heal:Math.max(1,R(p.maxHp*.03)),msg:'心臓石'}),
+ },
+ manaorb:{
+  turn:P=>P.N>=4&&p.mp<p.maxMp?{mp:1,msg:'ダイス数ボーナス'}:null,
+ },
+ guardstone:{
+  turn:P=>({shield:Math.max(1,R(P.S*.2)),msg:'合計の20%'}),
+ },
+ mirrorplate:{
+  take:()=>0.92,
+ },
+ pairring:{
+  dmg:P=>P.pairs>=2?{mul:1.4,msg:`ペア×${P.pairs}`}:null,
+ },
+ straightbow:{
+  dmg:P=>P.run>=3?{mul:1.5,msg:`連続${P.run}`}:null,
+ },
+ coincloak:{
+  take:()=>0.95,
+  onWin:()=>5,
+ },
+ rerollring:{
+  dmg:P=>p.rerollsUsed>=2?{mul:1.5,msg:`振り直し×${p.rerollsUsed}`}:null,
+ },
+ chainorb:{
+  dmg:P=>p.chain>0?{mul:+Math.pow(1.1,p.chain).toFixed(2),msg:`${p.chain}連鎖`}:null,
+ },
+ monarch:{
+  take:()=>0.5,
+  reflect:d=>d,
+ },
+ infwallet:{
+  dmg:P=>{const n=Math.floor(p.gold/100);return n?{mul:+Math.pow(1.1,n).toFixed(2),msg:`${fmt(p.gold)}G`}:null},
+ },
+ fateblade:{
+  dmg:P=>P.S%2===0?{mul:1.8,msg:'偶数の合計'}:null,
+ },
+ executionaxe:{
+  dmg:P=>e.hp<=e.maxHp*.3?{mul:2,msg:'処刑圏内'}:null,
+ },
+ overlordblade:{
+  dmg:P=>e.boss?{mul:1.7,msg:'ボス特効'}:null,
+ },
+ thorhammer:{
+  dmg:P=>P.even>=4?{add:50,msg:'雷撃'}:null,
+ },
+ sunblade:{
+  dmg:P=>P.N>0&&P.even===P.N?{mul:2,msg:'太陽の力'}:null,
+ },
+ moonblade:{
+  dmg:P=>P.N>0&&P.odd===P.N?{mul:2,msg:'月光の力'}:null,
+ },
+ demonslayer:{
+  dmg:P=>e.boss?{mul:2.5,msg:'魔王殺し'}:null,
+ },
+ twindragon:{
+  dmg:P=>P.pairs>=2?{mul:2,msg:'双竜共鳴'}:null,
+ },
+ starbreaker:{
+  dmg:P=>P.S>=50?{mul:2,msg:'星砕き'}:null,
+ },
+ deathdagger:{
+  dmg:P=>e.hp<=e.maxHp*.1?{mul:5,msg:'絶命の一撃'}:null,
+ },
+ icefang:{
+  dmg:P=>e.frozen?{mul:2,msg:'凍結特効'}:null,
+ },
+ firefang:{
+  dmg:P=>e.poison?{mul:2,msg:'毒への追撃'}:null,
+ },
+ rebellion:{
+  dmg:P=>p.hp<=p.maxHp/2?{mul:2,msg:'反逆の力'}:null,
+ },
+ luckyblade:{
+  dmg:P=>P.jack?{mul:5,msg:'豪運'}:null,
+ },
+ chaosblade:{
+  dmg:P=>({rand:[.5,4],msg:'混沌'}),
+ },
+ thunderlord:{
+  dmg:P=>(P.cnt[6]||0)>=4?{mul:3,msg:'雷帝降臨'}:null,
+ },
+ meteorblade:{
+  dmg:P=>P.run>=5?{mul:2,msg:'流星連撃'}:null,
+ },
+ divineblade:{
+  dmg:P=>p.gold>=1000?{mul:3,msg:'富の神罰'}:null,
+ },
+ harvestscythe:{
+  onWin:()=>0,
+  onWinHeal:()=>Math.max(1,R(p.maxHp*.08)),
+ },
+ berserkaxe:{
+  dmg:P=>({mul:1.25,msg:'狂戦士の一撃'}),
+ },
+ lifearmor:{
+  turn:P=>({heal:Math.max(1,R(p.maxHp*.05)),msg:'生命再生'}),
+ },
+ regenarmor:{
+  onTaken:()=>Math.max(1,R(p.maxHp*.03)),
+ },
+ barrierarmor:{
+  battleStart:()=>({barrier:Math.max(1,R(p.maxHp*.3))}),
+ },
+ godsteel:{
+  take:()=>.8,
+ },
+ giantarmor:{
+  take:()=>.85,
+ },
+ paladinarmor:{
+  take:()=>p.hp>=p.maxHp?0.5:1,
+ },
+ reflectarmor:{
+  reflect:d=>d,
+ },
+ cursedarmor:{
+  take:()=>1.2,
+  dmg:P=>({mul:1.5,msg:'呪装甲'}),
+ },
+ manaarmor:{
+  onTaken:()=>{p.mp=Math.min(p.maxMp,p.mp+1);return 0},
+ },
+ abyssarmor:{
+  dmg:P=>p.hp<=p.maxHp*.3?{mul:2,msg:'深淵の力'}:null,
+ },
+ dragonarmor:{
+  take:()=>e&&e.boss?0.7:1,
+ },
+ wratharmor:{
+  onTaken:d=>{p.wrath=(p.wrath||0)+Math.max(1,R(d*.5));return 0},
+  dmg:P=>p.wrath?{add:p.wrath,msg:'逆鱗の蓄積'}:null,
+ },
+ kingarmor:{
+  onWinHeal:()=>e.boss?p.maxHp:0,
+ },
+ guardianarmor:{
+  battleStart:()=>({shield:50}),
+ },
+ bastionarmor:{
+  take:()=>.75,
+ },
+ tristar:{
+  dmg:P=>(P.cnt[3]||0)>=3?{mul:3,msg:'三連星'}:null,
+ },
+ fourjade:{
+  dmg:P=>(P.cnt[4]||0)>=4?{mul:4,msg:'四象玉'}:null,
+ },
+ fivepoint:{
+  dmg:P=>{const n=P.cnt[5]||0;return n?{add:n*5,msg:'五芒星'}:null},
+ },
+ sixcrown:{
+  dmg:P=>(P.cnt[6]||0)>=4?{mul:5,msg:'六帝冠'}:null,
+ },
+ sunpendant:{
+  dmg:P=>P.N>0&&P.even===P.N?{mul:2,msg:'太陽の祝福'}:null,
+ },
+ moonpendant:{
+  dmg:P=>P.N>0&&P.odd===P.N?{mul:2,msg:'月の祝福'}:null,
+ },
+ blessingfeather:{
+  battleStart:()=>({barrier:Math.max(10,R(p.maxHp*.15))}),
+ },
+ sagegem:{
+  turn:P=>p.mp<p.maxMp?{mp:2,msg:'賢者の石'}:null,
+ },
+ wealthring:{
+  dmg:P=>{const n=Math.floor(p.gold/50);return n?{add:n*10,msg:'富豪の力'}:null},
+ },
+ billionring:{
+  dmg:P=>{const n=Math.floor(p.gold/100);return n?{mul:Math.pow(1.05,n),msg:'億万長者'}:null},
+ },
+ earthheart:{
+  turn:P=>({heal:Math.max(1,R(p.maxHp*.04)),msg:'大地の心臓'}),
+ },
+ overfloworb:{
+  dmg:P=>p.mp>=p.maxMp?{mul:2,msg:'MP満タン'}:null,
+ },
+ bloodring:{
+  dmg:P=>({mul:1+Math.max(0,1-p.hp/p.maxHp),msg:'血染め'}),
+ },
+ heroemblem:{
+  dmg:P=>e.boss?{mul:2,msg:'英雄の徽章'}:null,
+ },
+ dicecrown:{
+  dmg:P=>P.N>=10?{mul:2,msg:'骰子王冠'}:null,
+ },
+ wheeloffate:{
+  dmg:P=>P.jack?{mul:10,msg:'運命の輪'}:null,
+ },
+ worldtreeleaf:{
+  turn:P=>({heal:Math.max(1,R(p.maxHp*.05)),msg:'世界樹の葉'}),
+ },
+ godslayer:{
+  dmg:P=>e.boss?{mul:5,msg:'神殺し'}:null,
+ },
+ worldtreeheart:{
+  turn:P=>({heal:Math.max(1,R(p.maxHp*.05)),msg:'世界樹の心臓'}),
+ },
+ starblade:{
+  dmg:P=>({mul:1.5,msg:'星界の剣'}),
+ },
+ voidorb:{
+  dmg:P=>({mul:2,msg:'虚無'}),
+ },
+ oracleeye:{
+  turn:P=>({shield:Math.max(5,R(P.S*.25)),msg:'神託の瞳'}),
+ },
+ akashic:{
+  onWin:()=>Math.max(20,R(e.gold*.5)),
+ },
+};
+
+/* ===== スキル・魔法・パッシブ =====
+   スキル/魔法の名前・MP・待機ターン・説明は data/equipment.xlsx、効果のプログラムは js/skills_fx.js。
+   ここには、基本行動（こうげき・ぼうぎょ）とパッシブ、行動ボタンの表示用の処理が入っている。 */
+/* ===== 行動：1ターンに「行動回数」ぶん、各スキル1回まで ===== */
+const BASE=[
+ {id:'attack',type:'base',name:'こうげき',desc:'合計×倍率のダメージ。',
+  calc:P=>({ok:true,dmg:dmgOf(P.S*P.mult),note:`合計${fmt(P.S)} × 揃い${fmtM(P.mult)}`})},
+ {id:'guard',type:'base',name:'ぼうぎょ',desc:'合計×倍率×0.6のシールド。',
+  calc:P=>({ok:true,shield:Math.max(1,R(P.S*P.mult*.6)),isGuard:true,note:`合計${fmt(P.S)} × 揃い${fmtM(P.mult)} × 0.6`})},
+];
+const needLabel=s=>!s.needFace?'':s.needRatio?`【${s.needFace}の目がダイス数の${Math.round(s.needRatio*100)}%以上${s.needCount>1?`（最低${s.needCount}個）`:''}で使える】`:`【${s.needFace}の目が${s.needCount}個以上で使える】`;
+const skDesc=s=>needLabel(s)+(s.cd?`${s.desc}（使うと${s.cd}ターン使えない。次の階にも持ち越し）`:s.desc);
+
+const PASSIVES=[
+ {id:'mpstart',name:'魔力の泉',desc:'戦闘開始時にMPが4回復する。'},
+ {id:'regen',name:'自然治癒',desc:'毎ターン終了時に、最大HPの3%回復する。'},
+ {id:'dice',name:'ダイスの加護',desc:'ふつうのダイスが2個増える。'},
+ {id:'power',name:'闘志',desc:'与えるダメージが20%増える。'},
+ {id:'armor',name:'鉄の覚悟',desc:'受けるダメージが15%減る。'},
+ {id:'reroll',name:'強運',desc:'1ターンの振り直し回数が1回増える。'},
+ {id:'actions',name:'神速',desc:'1ターンの行動回数が1回増える。'},
+ {id:'haste',name:'加速',desc:'スキルと魔法の待機ターンが1短くなる。'},
+];
+const PASSIVE_BY=Object.fromEntries(PASSIVES.map(s=>[s.id,s]));
+
+function labelOf(r,P,sk){
+  const t=[];
+  if(r.dmg)t.push(`ダメージ約${fmt(previewFinal(r.dmg,P,sk))}`);
+  if(r.poison)t.push(`毒${fmtM(+(r.poison*100).toFixed(1))}%/ターン`);
+  if(r.burn&&r.dmg)t.push(`火傷約${fmt(R(previewFinal(r.dmg,P,sk)*r.burn))}`);
+  if(r.bleed&&r.dmg)t.push(`出血約${fmt(R(previewFinal(r.dmg,P,sk)*r.bleed))}×3回`);
+  if(r.freeze)t.push(e.boss?'攻撃半減':'凍結');
+  if(r.drain)t.push('吸収');
+  if(r.heal)t.push(`HP+${fmt(r.heal)}`);
+  if(r.shield)t.push(`シールド${fmt(r.isGuard?guardFinal(r.shield,P).final:r.shield)}`);
+  if(r.barrier)t.push(`バリア${fmt(r.barrier)}`);
+  if(r.hpCost)t.push(`HP-${r.hpCost}`);
+  if(r.dbl)t.push('次のダメージ×2');
+  if(r.dmg&&roleCritChance(P)>0)t.push(`会心${Math.round(roleCritChance(P)*100)}%`);
+  t.push(`速さ${actionSpeed(P)}`);
+  return t.join('・');
+}
+
+/* ===== スキル・魔法ごとの効果プログラム =====
+   名前・MP・待機ターン・説明・必要条件は data/equipment.xlsx で編集する。ここには「使ったとき何が起きるか」だけを書く。
+   キーは data/equipment.xlsx の「スキル」シートの ID と対応している。
+   使える条件（◯の目が◯個以上）は data/equipment.xlsx の「必要な目」「必要な個数」で決まる（読み込み時に、ここの calc の外側へ自動で付く）。
+   ここの ok は、HPが足りるかなど出目以外の条件だけを書く。
+   calc(P) は {ok:使えるか, dmg, heal, shield, barrier, poison, burn, bleed, stun, freeze, weaken, vulnerable, drain, gold, hpCost, dbl} などを返す。 */
+const SKILL_FX={
+ smash:P=>({ok:true,dmg:dmgOf(P.sumHigh*P.mult*1.5)}),
+ count:P=>({ok:true,dmg:dmgOf((P.cnt[1]||0)*P.S)}),
+ pair:P=>({ok:true,dmg:dmgOf(P.S*Math.max(P.pairs,1)*1.5)}),
+ straight:P=>({ok:true,dmg:dmgOf(P.S*Math.max(P.run,2)*1.5)}),
+ venom:P=>({ok:true,dmg:dmgOf(P.sumOdd),poison:0.015}),   // 毒：敵の最大HPの1.5%／ターン（重ねがけで増える）
+ double:P=>{const c=Math.max(1,R(p.maxHp*.1));return {ok:!p.dbl&&p.hp>c,hpCost:c,dbl:true}},
+ fire:P=>({ok:true,dmg:dmgOf(P.S*P.mult*1.5)}),
+ thunder:P=>({ok:true,dmg:dmgOf(P.S*P.mult*2.5)}),
+ ice:P=>({ok:true,dmg:dmgOf(P.S*P.mult*.8),freeze:true}),
+ drain:P=>({ok:true,dmg:dmgOf(P.S*P.mult*.8),drain:true}),
+ heal:P=>({ok:p.hp<p.maxHp,heal:Math.max(1,R(P.S*P.mult*.8))}),
+ barrier:P=>({ok:true,barrier:Math.max(1,R(P.S*P.mult*1.5))}),
+ quake:P=>({ok:true,dmg:dmgOf(P.S*P.mult*1.8)}),
+ starfall:P=>({ok:true,dmg:dmgOf(P.S*P.mult*3)}),
+ mend:P=>({ok:p.hp<p.maxHp,heal:Math.max(1,R(P.S*P.mult*1.5))}),
+ weakness:P=>({ok:true,dmg:dmgOf(P.S*P.mult),weaken:true}),
+ venomburst:P=>({ok:true,dmg:dmgOf(P.S*P.mult),poison:0.025}),   // 毒：敵の最大HPの2.5%／ターン
+ seven:P=>({ok:true,dmg:dmgOf(P.S*7)}),
+ oneslash:P=>({ok:true,dmg:dmgOf(P.S*10)}),
+ royal:P=>({ok:true,dmg:dmgOf(P.S*12)}),
+ evensmash:P=>({ok:true,dmg:dmgOf(P.S*5)}),
+ oddrush:P=>({ok:true,dmg:dmgOf(P.odd*P.sumOdd)}),
+ sixgod:P=>({ok:true,dmg:dmgOf(P.S*Math.pow(P.cnt[6]||0,2))}),
+ triangle:P=>({ok:true,dmg:dmgOf(P.S*6)}),
+ quad:P=>({ok:true,dmg:dmgOf(P.S*8)}),
+ pentagram:P=>({ok:true,dmg:dmgOf(P.S*12)}),
+ jackpot:P=>({ok:true,dmg:dmgOf(P.S*20)}),
+ meteor:P=>({ok:true,dmg:dmgOf(P.S*5)}),
+ nova:P=>({ok:true,dmg:dmgOf(P.S*8)}),
+ superheal:P=>({ok:p.hp<p.maxHp,heal:Math.max(1,R(P.S*P.mult*2))}),
+ lifeburst:P=>({ok:true,dmg:dmgOf(P.S*3)}),
+ goldrain:P=>({ok:true,gold:Math.max(1,R(P.S))}),
+ sacrifice:P=>{const c=Math.max(1,R(p.maxHp*.2));return {ok:p.hp>c,hpCost:c,dmg:dmgOf(P.S*8)}},
+ timebreak:P=>({ok:true,freeze:true}),
+ blooddrain:P=>({ok:true,dmg:dmgOf(P.S*P.mult*2),drain:true}),
+ flare:P=>({ok:true,dmg:dmgOf(P.S*P.mult),burn:0.3}),   // 火傷：この行動のダメージの30%（付与時に即座に＋そのあと2ターン）
+ rupture:P=>({ok:true,dmg:dmgOf(P.S*P.mult),bleed:0.25}),   // 出血：この行動のダメージの25%（敵がダメージを受けるたびに、3回分）
+ stunstrike:P=>({ok:true,dmg:dmgOf(P.S*P.mult*1.2),stun:true}),
+ expose:P=>({ok:true,vulnerable:true}),
+};
+
+/* ===== プロフィール（アカウントの代わり） =====
+   この端末のブラウザの中で、名前ごとに「セーブ・自己ベスト・図鑑」を分けて保存する。
+   パスワードやサーバーは使わない。別の端末へは「引き継ぎコード」（書き出し／取り込み）で移す。
+   ※ ブラウザのデータを消すとプロフィールも消えるので、大事なものは引き継ぎコードで控えておく。 */
+const PROFILES_KEY='chiisana-meikyu-profiles-v1';
+const LEGACY_KEYS={save:'chiisana-meikyu-dice-save-v4',best:'chiisana-meikyu-dice-best-v1',codex:'chiisana-meikyu-dice-codex-v1'};
+const PROFILE_MAX=8,PROFILE_NAME_MAX=12,CODE_PREFIX='MEIKYU1';
+let profiles={cur:'',list:[]};          // list: [{id,name,created}]
+let SAVE_KEY='',BEST_KEY='',CODEX_KEY='';   // 使用中のプロフィールの保存先（切り替えると変わる）
+
+const profileKey=(kind,id)=>`chiisana-meikyu-${kind}:${id}`;
+const lsGet=k=>{try{return localStorage.getItem(k)}catch(_){return null}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,v);return true}catch(_){return false}};
+const lsDel=k=>{try{localStorage.removeItem(k)}catch(_){}};
+const parseJSON=t=>{try{return t==null?null:JSON.parse(t)}catch(_){return null}};
+const escHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------- 保存と初期化 ---------- */
+function profilesSave(){lsSet(PROFILES_KEY,JSON.stringify(profiles))}
+function profilesLoad(){
+  const d=parseJSON(lsGet(PROFILES_KEY));
+  profiles={cur:'',list:[]};
+  if(d&&Array.isArray(d.list)){
+    for(const x of d.list){
+      if(x&&typeof x.id==='string'&&/^[a-z0-9]{3,32}$/.test(x.id)&&typeof x.name==='string'&&!profiles.list.some(p=>p.id===x.id))
+        profiles.list.push({id:x.id,name:profileName(x.name)||'プレイヤー',created:Number(x.created)||0});
+    }
+    if(typeof d.cur==='string')profiles.cur=d.cur;
+  }
+}
+const profileName=raw=>String(raw||'').replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,PROFILE_NAME_MAX);
+function uniqueName(name){let n=name,k=2;while(profiles.list.some(p=>p.name===n)){n=name.slice(0,PROFILE_NAME_MAX-4)+'('+k+')';k++}return n}
+function createProfile(name){
+  const id='p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  profiles.list.push({id,name:uniqueName(profileName(name)||'プレイヤー'),created:Date.now()});
+  profilesSave();
+  return id;
+}
+function setProfileKeys(){SAVE_KEY=profileKey('save',profiles.cur);BEST_KEY=profileKey('best',profiles.cur);CODEX_KEY=profileKey('codex',profiles.cur)}
+function initProfiles(){
+  profilesLoad();
+  if(!profiles.list.length){
+    // 初めて：プロフィール機能の前に遊んでいた分（あれば）を「プレイヤー1」に引き継ぐ
+    const id=createProfile('プレイヤー1');
+    for(const [kind,legacy] of Object.entries(LEGACY_KEYS)){const v=lsGet(legacy);if(v!==null)lsSet(profileKey(kind,id),v)}
+    profiles.cur=id;
+  }
+  if(!profiles.list.some(p=>p.id===profiles.cur))profiles.cur=profiles.list[0].id;
+  profilesSave();setProfileKeys();
+}
+initProfiles();
+
+const curProfile=()=>profiles.list.find(p=>p.id===profiles.cur);
+// 切り替えたあと、ゲーム側に残っている「前のプロフィールの状態」を捨てて読み直す
+function reloadRuntimeState(){
+  p=null;bestCache=loadBest();
+  codex=loadCodex();codexRebuild();
+}
+function switchProfile(id){
+  if(!profiles.list.some(x=>x.id===id))return;
+  profiles.cur=id;profilesSave();setProfileKeys();reloadRuntimeState();
+}
+function deleteProfile(id){
+  if(profiles.list.length<=1)return;
+  for(const kind of ['save','best','codex'])lsDel(profileKey(kind,id));
+  profiles.list=profiles.list.filter(x=>x.id!==id);
+  if(profiles.cur===id){profiles.cur=profiles.list[0].id;setProfileKeys();reloadRuntimeState()}
+  profilesSave();
+}
+function profileSummary(id){
+  const best=parseJSON(lsGet(profileKey('best',id)));
+  const cx=parseJSON(lsGet(profileKey('codex',id)));
+  const items=cx&&cx.own&&Array.isArray(cx.own.items)?cx.own.items.filter(k=>ITEM_BY[k]).length:0;
+  const sv=parseJSON(lsGet(profileKey('save',id)));
+  const hasSave=!!(sv&&sv.v===4&&sv.p&&Number.isFinite(sv.next));
+  return `${best&&Number.isFinite(best.floor)&&best.floor?`最高 地下${best.floor}階`:'まだ冒険していない'} ／ 装備 ${items}/${ITEMS.length}${hasSave?` ／ セーブ：地下${Math.max(1,Math.floor(sv.next))+1}階`:''}`;
+}
+
+/* ---------- 引き継ぎコード ---------- */
+function toB64(str){
+  const bytes=new TextEncoder().encode(str);let bin='';
+  for(let i=0;i<bytes.length;i+=8192)bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+8192));
+  return btoa(bin);
+}
+function fromB64(b64){
+  const bin=atob(b64);
+  return new TextDecoder('utf-8',{fatal:true}).decode(Uint8Array.from(bin,c=>c.charCodeAt(0)));
+}
+function hash32(str){let h=0x811c9dc5;for(const b of new TextEncoder().encode(str)){h^=b;h=Math.imul(h,0x01000193)>>>0}return h.toString(16).padStart(8,'0')}
+function exportProfile(id){
+  const pr=profiles.list.find(x=>x.id===id);
+  const json=JSON.stringify({app:'chiisana-meikyu-dice',v:1,name:pr.name,
+    save:parseJSON(lsGet(profileKey('save',id))),best:parseJSON(lsGet(profileKey('best',id))),codex:parseJSON(lsGet(profileKey('codex',id)))});
+  return `${CODE_PREFIX}.${toB64(json)}.${hash32(json)}`;
+}
+function cleanCodex(c){
+  const out=codexEmpty();
+  if(!c||!c.own||!c.seen)return out;
+  for(const k of CODEX_KINDS)for(const w of ['own','seen']){
+    const a=c[w]&&c[w][k];
+    if(Array.isArray(a))out[w][k]=[...new Set(a.filter(x=>typeof x==='string'&&x.length<=64))].slice(0,1000);
+  }
+  return out;
+}
+// 取り込むと「新しいプロフィール」ができる（いまのプロフィールは上書きしない）
+function importProfile(text){
+  const t=String(text||'').replace(/\s+/g,'');
+  if(t.length>300000)return {error:'コードが長すぎます。'};
+  const m=t.match(new RegExp(`^${CODE_PREFIX}\\.([A-Za-z0-9+/=]+)\\.([0-9a-f]{8})$`));
+  if(!m)return {error:`コードの形式が違います。「${CODE_PREFIX}.」で始まるコード全体を貼り付けてください。`};
+  let json;try{json=fromB64(m[1])}catch(_){return {error:'コードを読み取れませんでした。'}}
+  if(hash32(json)!==m[2])return {error:'コードが途中で切れているか、書き換えられています。'};
+  const d=parseJSON(json);
+  if(!d||d.app!=='chiisana-meikyu-dice'||d.v!==1)return {error:'このゲームのコードではありません。'};
+  if(profiles.list.length>=PROFILE_MAX)return {error:`プロフィールは${PROFILE_MAX}個までです。いらないものを削除してから取り込んでください。`};
+  const id=createProfile(profileName(d.name)||'ひきつぎ');
+  const sv=d.save,bs=d.best;
+  if(sv&&sv.v===4&&sv.p&&typeof sv.p==='object'&&Number.isFinite(sv.next))lsSet(profileKey('save',id),JSON.stringify(sv));
+  if(bs&&Number.isFinite(bs.floor)&&Number.isFinite(bs.maxHit))lsSet(profileKey('best',id),JSON.stringify({floor:bs.floor,maxHit:bs.maxHit}));
+  lsSet(profileKey('codex',id),JSON.stringify(cleanCodex(d.codex)));
+  return {id,name:profiles.list.find(x=>x.id===id).name};
+}
+
+/* ---------- 画面 ---------- */
+let pfArmed='';   // 削除の確認中のプロフィールID
+const pfBtn=(act,label,id,extra='')=>`<button class="sbtn" data-act="${act}"${id?` data-id="${id}"`:''} ${extra}>${label}</button>`;
+const pfWide=(act,label,go)=>`<button class="card${go?' go':''}" data-act="${act}"><span class="ct" style="justify-content:center"><b>${label}</b></span></button>`;
+function pfLeave(){$('#ovB').onclick=null;pfArmed='';titleScreen()}
+
+function showProfiles(msg){
+  const rows=profiles.list.map(x=>{
+    const cur=x.id===profiles.cur,armed=pfArmed===x.id;
+    return `<div class="card cdx ${cur?'own':''}"><span class="ct"><b>${escHtml(x.name)}</b><em>${cur?'使用中':''}</em></span><span class="cd">${escHtml(profileSummary(x.id))}</span>`+
+      `<span class="pfbtns">${cur?'':pfBtn('use','このプロフィールで遊ぶ',x.id)}${pfBtn('rename','名前を変える',x.id)}${pfBtn('export','引き継ぎコード',x.id)}`+
+      `${profiles.list.length>1?pfBtn('del',armed?'本当に削除する？':'削除',x.id):''}</span></div>`;
+  }).join('');
+  showOv('プロフィール',(msg?`<span class="pfmsg">${escHtml(msg)}</span><br>`:'')+'<span class="cdnote">セーブ・自己ベスト・図鑑は、プロフィールごとに別々に保存されます。パスワードはなく、このブラウザの中だけに保存されます。</span>',
+    rows+(profiles.list.length<PROFILE_MAX?pfWide('new','＋ 新しいプロフィール'):'')+pfWide('import','引き継ぎコードを取り込む')+pfWide('back','戻る',true));
+  $('#ovB').onclick=ev=>{
+    const b=ev.target.closest('button[data-act]');if(!b)return;
+    const act=b.dataset.act,id=b.dataset.id;
+    if(act!=='del')pfArmed='';
+    if(act==='back')return pfLeave();
+    if(act==='use'){switchProfile(id);return pfLeave()}
+    if(act==='new')return showProfileForm('new');
+    if(act==='rename')return showProfileForm('rename',id);
+    if(act==='export')return showExport(id);
+    if(act==='import')return showImport();
+    if(act==='del'){
+      if(pfArmed!==id){pfArmed=id;return showProfiles()}
+      const name=profiles.list.find(x=>x.id===id).name;pfArmed='';deleteProfile(id);return showProfiles(`「${name}」を削除しました。`);
+    }
+  };
+}
+function showProfileForm(mode,id){
+  const pr=id&&profiles.list.find(x=>x.id===id);
+  showOv(mode==='new'?'新しいプロフィール':'名前を変える',`<span class="cdnote">名前は${PROFILE_NAME_MAX}文字までです。</span>`,
+    `<input class="pfin" id="pfName" maxlength="${PROFILE_NAME_MAX}" placeholder="名前" value="${pr?escHtml(pr.name):''}" autocomplete="off"><span class="pfmsg" id="pfErr"></span>`+
+    pfWide('ok',mode==='new'?'作る':'変更する',true)+pfWide('cancel','やめる'));
+  const input=$('#pfName');input.focus();input.select();
+  const submit=()=>{
+    const name=profileName(input.value);
+    if(!name){$('#pfErr').textContent='名前を入力してください。';return}
+    if(profiles.list.some(x=>x.name===name&&x.id!==id)){$('#pfErr').textContent='同じ名前のプロフィールがあります。';return}
+    if(mode==='new'){
+      if(profiles.list.length>=PROFILE_MAX)return showProfiles(`プロフィールは${PROFILE_MAX}個までです。`);
+      const nid=createProfile(name);switchProfile(nid);return pfLeave();   // 作ったらそのまま使う
+    }
+    pr.name=name;profilesSave();showProfiles('名前を変更しました。');
+  };
+  input.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();submit()}};
+  $('#ovB').onclick=ev=>{
+    const b=ev.target.closest('button[data-act]');if(!b)return;
+    if(b.dataset.act==='ok')submit();else showProfiles();
+  };
+}
+function showExport(id){
+  const pr=profiles.list.find(x=>x.id===id),code=exportProfile(id);
+  showOv('引き継ぎコード',`<span class="cdnote">「${escHtml(pr.name)}」のセーブ・自己ベスト・図鑑が入っています。別の端末の「引き継ぎコードを取り込む」に貼り付けると、新しいプロフィールとして復元されます。パスワードはないので、コードは人に見せないでください。</span>`,
+    `<textarea class="pfin" id="pfCode" rows="6" readonly>${code}</textarea><span class="pfmsg" id="pfErr"></span>`+
+    pfWide('copy','コピーする')+pfWide('file','ファイルに保存する')+pfWide('cancel','戻る',true));
+  const area=$('#pfCode');area.onclick=()=>area.select();
+  $('#ovB').onclick=async ev=>{
+    const b=ev.target.closest('button[data-act]');if(!b)return;
+    const act=b.dataset.act;
+    if(act==='cancel')return showProfiles();
+    if(act==='copy'){
+      try{await navigator.clipboard.writeText(code);$('#pfErr').textContent='コピーしました。'}
+      catch(_){area.select();$('#pfErr').textContent='自動でコピーできませんでした。選択されたコードを、手動でコピーしてください。'}
+    }
+    if(act==='file'){
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([code],{type:'text/plain'}));a.download='chiisana-meikyu-save.txt';
+      document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+      $('#pfErr').textContent='保存しました（ダウンロードフォルダを確認してください）。';
+    }
+  };
+}
+function showImport(){
+  showOv('引き継ぎコードを取り込む','<span class="cdnote">書き出したコードを貼り付けるか、保存したファイルを選んでください。新しいプロフィールとして取り込まれ、いまのプロフィールは変わりません。</span>',
+    `<textarea class="pfin" id="pfCode" rows="6" placeholder="${CODE_PREFIX}.…"></textarea><input type="file" id="pfFile" accept=".txt,text/plain" class="pfin"><span class="pfmsg" id="pfErr"></span>`+
+    pfWide('ok','取り込む',true)+pfWide('cancel','やめる'));
+  const area=$('#pfCode');
+  $('#pfFile').onchange=async ev=>{const f=ev.target.files[0];if(f)area.value=(await f.text()).slice(0,300000)};
+  $('#ovB').onclick=ev=>{
+    const b=ev.target.closest('button[data-act]');if(!b)return;
+    if(b.dataset.act==='cancel')return showProfiles();
+    if(b.dataset.act==='ok'){
+      const r=importProfile(area.value);
+      if(r.error){$('#pfErr').textContent=r.error;return}
+      showProfiles(`「${r.name}」を取り込みました。使うには「このプロフィールで遊ぶ」を押してください。`);
+    }
+  };
+}
+
+/* ===== 図鑑（見つけた装備・ダイス・スキルをこの端末に記録。やられても消えない） ===== */
+const CODEX_KINDS=['items','dice','skills','status'];
+const codexEmpty=()=>({own:{items:[],dice:[],skills:[],status:[]},seen:{items:[],dice:[],skills:[],status:[]}});
+function loadCodex(){
+  const c=codexEmpty();
+  try{
+    const d=JSON.parse(localStorage.getItem(CODEX_KEY)||'null');
+    if(d&&d.own&&d.seen)for(const k of CODEX_KINDS)for(const w of ['own','seen']){
+      if(Array.isArray(d[w][k]))c[w][k]=d[w][k].filter(x=>typeof x==='string');
+    }
+  }catch(_){}
+  return c;
+}
+let codex=loadCodex();
+const codexSets={own:{},seen:{}};
+function codexRebuild(){for(const w of ['own','seen']){codexSets[w]={};for(const k of CODEX_KINDS)codexSets[w][k]=new Set(codex[w][k])}}
+codexRebuild();
+function codexSave(){try{localStorage.setItem(CODEX_KEY,JSON.stringify(codex))}catch(_){}}
+// which: 'own'（手に入れた）/ 'seen'（見かけた）。手に入れたものは見かけたことにもなる
+function codexAdd(which,kind,ids){
+  let ch=false;
+  for(const id of ids){
+    if(!id||typeof id!=='string')continue;
+    if(!codexSets[which][kind].has(id)){codexSets[which][kind].add(id);codex[which][kind].push(id);ch=true}
+    if(which==='own'&&!codexSets.seen[kind].has(id)){codexSets.seen[kind].add(id);codex.seen[kind].push(id);ch=true}
+  }
+  if(ch)codexSave();
+  return ch;
+}
+function codexStatus(k){codexAdd('own','status',[k])}
+function codexSync(){
+  if(!p)return;
+  codexAdd('own','items',p.equip.map(x=>x.id));
+  codexAdd('own','dice',p.slots);
+  codexAdd('own','skills',p.skills);
+}
+// 選択肢に付けるしるし。'new'＝図鑑にまだ載っていない初登場／'un'＝見たことはあるが一度も手に入れていない。記録する前に判定する
+function codexMark(list){
+  for(const o of list||[]){
+    const id=o&&typeof o.id==='string'?o.id:'';
+    let kind='',key='';
+    if(id.startsWith('i_')&&ITEM_BY[id.slice(2)]){kind='items';key=id.slice(2)}
+    else if(id.startsWith('d_')&&DICE_T[id.slice(2)]){kind='dice';key=id.slice(2)}
+    else if(id.startsWith('s_')&&SKILLS.some(s=>s.id===id.slice(2))){kind='skills';key=id.slice(2)}
+    if(!kind)continue;
+    o.mark=!codexSets.seen[kind].has(key)?'new':!codexSets.own[kind].has(key)?'un':'';
+  }
+}
+const markHTML=o=>o&&o.mark==='new'?'<span class="nw">NEW</span>':o&&o.mark==='un'?'<span class="nw un">未入手</span>':'';
+function codexSee(list){
+  codexMark(list);
+  const add={items:[],dice:[],skills:[],status:[]};
+  for(const o of list||[]){
+    const id=o&&typeof o.id==='string'?o.id:'';
+    if(id.startsWith('i_')&&ITEM_BY[id.slice(2)])add.items.push(id.slice(2));
+    else if(id.startsWith('d_')&&DICE_T[id.slice(2)])add.dice.push(id.slice(2));
+    else if(id.startsWith('s_')&&SKILLS.some(s=>s.id===id.slice(2)))add.skills.push(id.slice(2));
+  }
+  for(const k of CODEX_KINDS)if(add[k]&&add[k].length)codexAdd('seen',k,add[k]);
+}
+const STATUS_FX=[
+ {id:'poison',name:'毒',desc:'重ねがけするほど強くなる。毎ターン、敵の最大HPの一定割合のダメージ（上限あり）。ボス戦向け。「猛毒の牙」で2倍。',via:['venom','venomburst']},
+ {id:'burn',name:'火傷',desc:'付与した瞬間に1回分のダメージが入り、そのあと2ターン続く。',via:['flare']},
+ {id:'bleed',name:'出血',desc:'敵がダメージを受けるたびに、追加ダメージが入る（3回分）。',via:['rupture']},
+ {id:'stun',name:'スタン',desc:'通常の敵の次の行動を1回止める。ボスには効かず、代わりに次の攻撃が弱体化する。',via:['stunstrike']},
+ {id:'freeze',name:'凍結',desc:'敵の次の行動を飛ばす（1戦闘に1回まで）。ボスは凍らず、次の攻撃が弱体化する。「氷牙」で凍結中の敵へのダメージが2倍。',via:['ice','timebreak']},
+ {id:'weak',name:'弱体',desc:'敵の次の攻撃のダメージが半分になる。',via:['weakness']},
+ {id:'vulnerable',name:'弱点看破',desc:'次に受けるダメージが1.5倍になる（1回）。',via:['expose']},
+];
+function codexRows(kind){
+  if(kind==='status')return STATUS_FX.map(f=>({id:f.id,name:f.name,tag:'状態異常',slotTag:'',desc:f.desc+'　付与：'+f.via.map(id=>(SKILLS.find(s=>s.id===id)||{name:id}).name).concat(ITEMS.filter(it=>it.statusOnHit===(f.id==='weak'?'weaken':f.id)).map(it=>it.name+'（装備）')).join('・'),cls:''}));
+  if(kind==='items')return ITEMS.slice().sort((a,b)=>(a.leg?1:0)-(b.leg?1:0)||a.price-b.price).map(it=>({id:it.id,name:it.name,tag:SLOT_TYPE[it.slot]+(it.leg?'・伝説':it.rare?'・レア':''),slotTag:SLOT_TYPE[it.slot],desc:it.desc,cls:it.leg?'legend':'',slot:it.slot}));
+  if(kind==='dice')return Object.keys(DICE_T).map(k=>({id:k,name:DICE_T[k].name,tag:'ダイス',slotTag:'',desc:DICE_T[k].desc,cls:''}));
+  return SKILLS.map(s=>({id:s.id,name:s.name,tag:s.type==='atk'?'スキル':`魔法・MP${s.mp}`,slotTag:'',desc:skDesc(s),cls:''}));
+}
+const codexCount=k=>codexRows(k).filter(r=>codexSets.own[k].has(r.id)).length;
+let codexTab='items',codexArmed=false;
+function codexCard(r,kind){
+  const st=codexSets.own[kind].has(r.id)?'own':codexSets.seen[kind].has(r.id)?'seen':'unk';
+  if(st==='unk')return `<div class="card cdx unk"><span class="ct"><b>？？？</b><em>${r.slotTag}</em></span><span class="cd">まだ見つけていない</span></div>`;
+  return `<div class="card cdx ${st} ${r.cls}"><span class="ct"><b>${r.name}</b><em>${r.tag}・${st==='own'?(kind==='status'?'確認済み':'入手済み'):'見かけた'}</em></span><span class="cd">${r.desc}</span></div>`;
+}
+function showCodex(){
+  const kind=codexTab,rows=codexRows(kind);
+  const tabs=[['items','装備'],['dice','ダイス'],['skills','スキル'],['status','状態異常']].map(([k,n])=>
+    `<button class="cdtab ${k===kind?'on':''}" data-t="${k}">${n}<br><small>${codexCount(k)}/${codexRows(k).length}</small></button>`).join('');
+  let list='';
+  if(kind==='items'){
+    for(const sl of ['weapon','armor','acc']){
+      const rs=rows.filter(r=>r.slot===sl);
+      list+=`<div class="cdh">${SLOT_TYPE[sl]}　${rs.filter(r=>codexSets.own.items.has(r.id)).length}/${rs.length}</div>`+rs.map(r=>codexCard(r,kind)).join('');
+    }
+  }else list=rows.map(r=>codexCard(r,kind)).join('');
+  showOv('図鑑','<span class="cdnote">見つけたもの・体験した状態異常がこの端末に記録されます。やられても消えません。</span>',
+    `<div class="cdtabs">${tabs}</div>${list}`+
+    `<button class="card go" id="cdBack"><span class="ct" style="justify-content:center"><b>戻る</b></span></button>`+
+    `<button class="card" id="cdReset"><span class="ct" style="justify-content:center"><b id="cdResetT">${codexArmed?'本当に消す？（もう一度押すと消えます）':'図鑑をリセット'}</b></span></button>`);
+  $('#ovB').onclick=ev=>{
+    const t=ev.target.closest('button[data-t]');
+    if(t){codexTab=t.dataset.t;codexArmed=false;showCodex();$('#ov').scrollTop=0;return}
+    if(ev.target.closest('#cdBack')){$('#ovB').onclick=null;codexArmed=false;titleScreen();return}
+    if(ev.target.closest('#cdReset')){
+      if(!codexArmed){codexArmed=true;showCodex();return}
+      codexArmed=false;codex=codexEmpty();codexRebuild();codexSave();showCodex();
+    }
+  };
+}
+
+/* ===== データ表（Excel）の読み込みと組み立て =====
+   data/equipment.xlsx（装備・スキル・ダイス）を読み、効果のプログラム（ITEM_FX・SKILL_FX）とくっつけて
+   ゲームで使う ITEMS / SKILLS / DICE_T を作る。列は「1行目の見出しの名前」で判別するので、列の順番は変えてもよい。 */
+const DATA_FILE='data/equipment.xlsx';
+let ITEMS=[],ITEM_BY={},SKILLS=[],SKILL_BY={},ALL={},DICE_T={};
+const DATA_WARNINGS=[];
+
+const ITEM_PARAM_COLS={   // Excelの見出し → ゲーム内の項目名
+  '出目の合計×':'sumMul','揃いボーナス2乗':'matchPow','行動回数+':'actions','勝利時MP+':'onWinMp','勝利ゴールド×':'goldMul',
+  '致死耐え回数':'undying','待機ターン短縮':'cooldownReduce','戦闘中ダイス+':'battleDice','MP消費軽減':'mpDiscount',
+  'シールド×':'shieldMul','回避率(0〜1)':'dodge','毒ダメージ×':'poisonMul','反射ダメージ×':'refMul','スキル威力×(例 meteor:2)':'skillMul',
+  '行動の速さ+':'speedBonus','攻撃時の状態異常':'statusOnHit','状態異常の強さ(与ダメ×)':'statusPower','付与確率(0〜1)':'statusChance',
+};
+const STATUS_FROM_JP={'毒':'poison','火傷':'burn','出血':'bleed','スタン':'stun','凍結':'freeze','弱体':'weaken','弱点看破':'vulnerable'};
+const SLOT_FROM_JP={'武器':'weapon','防具':'armor','アクセ':'acc','アクセサリー':'acc','weapon':'weapon','armor':'armor','acc':'acc'};
+const TYPE_FROM_JP={'スキル':'atk','攻撃':'atk','atk':'atk','魔法':'mag','まほう':'mag','mag':'mag'};
+
+const warn=msg=>{DATA_WARNINGS.push(msg);console.warn('[データ表] '+msg)};
+const blank=v=>v===undefined||v===null||(typeof v==='string'&&v.trim()==='');
+const str=v=>blank(v)?'':String(v).trim();
+const num=v=>{if(blank(v))return undefined;const n=Number(v);return Number.isFinite(n)?n:undefined};
+const truthy=v=>v===true||(!blank(v)&&/^(○|〇|◯|1|true|yes|y|はい)$/i.test(String(v).trim()));
+
+// シートを「見出し名→値」の行リストにする（IDが空の行は無視）
+function sheetRows(T,name){
+  const rows=T[name];
+  if(!rows||!rows.length)throw new Error(`シート「${name}」が見つかりません`);
+  const head=(rows[0]||[]).map(h=>blank(h)?'':String(h).trim());
+  const out=[];
+  rows.slice(1).forEach((r,i)=>{
+    const o={_row:i+2};
+    head.forEach((h,c)=>{if(h&&!blank(r[c]))o[h]=r[c]});
+    if(!blank(o['ID']))out.push(o);
+  });
+  return out;
+}
+function parseFaces(v,where){
+  const out=[];
+  for(const tok of String(v==null?'':v).split(/[,\s、，]+/).filter(Boolean)){
+    const m=tok.match(/^(\d+)[-〜~](\d+)$/);
+    if(m){for(let n=+m[1];n<=+m[2];n++)out.push(n)}
+    else if(/^\d+$/.test(tok))out.push(+tok);
+    else warn(`${where}：出る目「${tok}」は数字ではありません`);
+  }
+  return out;
+}
+function parseSkillMul(v,where){
+  const o={};
+  for(const tok of String(v).split(/[,\s、，]+/).filter(Boolean)){
+    const m=tok.match(/^([A-Za-z0-9_]+)[:：]([0-9.]+)$/);
+    if(m)o[m[1]]=+m[2];else warn(`${where}：スキル威力「${tok}」は「スキルID:倍率」の形で書いてください`);
+  }
+  return Object.keys(o).length?o:undefined;
+}
+
+// 効果プログラム calc の外側に「◯の目が◯個以上」の条件をかぶせる
+function withFaceNeed(calc,face,count,ratio){
+  return P=>{
+    const r=calc(P),c=P.cnt[face]||0;
+    const need=ratio?Math.max(count,Math.ceil(P.N*ratio-1e-9)):count;   // 割合ありなら、ダイス数に応じて必要な個数が変わる
+    return c<need?Object.assign({},r,{ok:false,needText:`${face}の目が${need}個以上必要（${ratio?`ダイスの${Math.round(ratio*100)}%・`:''}いま${c}個）`}):r;
+  };
+}
+function buildData(T){
+  DATA_WARNINGS.length=0;
+  // --- ダイス
+  const dice={},seen=new Set();
+  for(const r of sheetRows(T,'ダイス')){
+    const id=str(r['ID']),where=`ダイス ${r._row}行目(${id})`;
+    if(seen.has(id)){warn(`${where}：IDが重複しています（無視）`);continue}
+    seen.add(id);
+    const faces=parseFaces(r['出る目(カンマ区切り)'],where);
+    if(!faces.length){warn(`${where}：出る目が空のため無視します`);continue}
+    dice[id]={name:str(r['名前'])||id,tag:str(r['表示']),faces,price:num(r['価格'])||0,desc:str(r['説明'])};
+  }
+  if(!dice.normal)throw new Error('ダイスシートに「normal」（ふつうのダイス）が必要です');
+  // --- 装備
+  const items=[];seen.clear();
+  for(const r of sheetRows(T,'装備')){
+    const id=str(r['ID']),where=`装備 ${r._row}行目(${id})`;
+    if(seen.has(id)){warn(`${where}：IDが重複しています（無視）`);continue}
+    seen.add(id);
+    const slot=SLOT_FROM_JP[str(r['枠'])];
+    if(!slot){warn(`${where}：枠「${str(r['枠'])}」は 武器／防具／アクセ のどれかにしてください（無視）`);continue}
+    const it={id,slot,name:str(r['名前'])||id,price:num(r['価格'])||0,desc:str(r['説明'])};
+    const rar=str(r['レア度']);
+    if(rar==='レア')it.rare=true;else if(rar==='伝説')it.leg=true;else if(rar&&rar!=='通常')warn(`${where}：レア度「${rar}」は 通常／レア／伝説 のどれかにしてください`);
+    for(const [col,key] of Object.entries(ITEM_PARAM_COLS)){
+      const v=r[col];if(blank(v))continue;
+      if(key==='matchPow'){if(truthy(v))it.matchPow=true}
+      else if(key==='skillMul'){const m=parseSkillMul(v,where);if(m)it.skillMul=m}
+      else if(key==='statusOnHit'){const k=STATUS_FROM_JP[str(v)];if(k)it.statusOnHit=k;else warn(`${where}：状態異常「${str(v)}」は 毒／火傷／出血／スタン／凍結／弱体／弱点看破 のどれかにしてください`)}
+      else if(key==='statusChance'){const n=num(v);if(n===undefined||n<0)warn(`${where}：「${col}」は0〜1の数字にしてください`);else it.statusChance=n>1?n/100:n}
+      else{const n=num(v);if(n===undefined)warn(`${where}：「${col}」は数字にしてください`);else it[key]=n}
+    }
+    items.push(Object.assign(it,ITEM_FX[id]||{}));
+  }
+  const stopped=new Set(T['停止中の装備']?sheetRows(T,'停止中の装備').map(r=>str(r['ID'])):[]);   // 一時的に外した装備（装備シートへ戻せば復活）
+  for(const id of Object.keys(ITEM_FX))if(!seen.has(id)&&!stopped.has(id))warn(`装備の効果「${id}」に対応する行が、装備シートにありません`);
+  if(!items.length)throw new Error('装備シートにデータがありません');
+  // --- スキル
+  const skills=[];seen.clear();
+  for(const r of sheetRows(T,'スキル')){
+    const id=str(r['ID']),where=`スキル ${r._row}行目(${id})`;
+    if(seen.has(id)){warn(`${where}：IDが重複しています（無視）`);continue}
+    seen.add(id);
+    const type=TYPE_FROM_JP[str(r['種別'])];
+    if(!type){warn(`${where}：種別「${str(r['種別'])}」は スキル／魔法 のどちらかにしてください（無視）`);continue}
+    const calc=SKILL_FX[id];
+    if(!calc){warn(`${where}：効果のプログラムがないため、このスキルは使えません（無視）`);continue}
+    const s={id,type,name:str(r['名前'])||id,desc:str(r['説明'])};
+    const mp=num(r['MP']);if(mp!==undefined)s.mp=mp;
+    if(!blank(r['必要条件(使えない時の表示)']))s.need=str(r['必要条件(使えない時の表示)']);
+    s.cd=num(r['待機ターン'])||0;
+    // 使える条件：「◯の目が◯個以上」（出目以外の条件は、効果プログラム側の ok で判定する）
+    //   「必要な個数」だけ ＝ その個数以上。「必要な割合」も書くと ＝ ダイス数×割合（切り上げ）以上で、かつ「必要な個数」を最低ラインにする
+    const nf=num(r['必要な目']),nc=num(r['必要な個数']);let nr=num(r['必要な割合(ダイス数×)']);
+    if(nr!==undefined&&nr>1)nr=nr/100;   // 50 と書かれても 50% として扱う
+    if(nf!==undefined||nc!==undefined||nr!==undefined){
+      if(nf===undefined||!Number.isInteger(nf)||nf<1)warn(`${where}：「必要な目」は1以上の整数にしてください（条件なしになります）`);
+      else if(nc!==undefined&&(!Number.isInteger(nc)||nc<1))warn(`${where}：「必要な個数」は1以上の整数にしてください（条件なしになります）`);
+      else if(nr!==undefined&&!(nr>0&&nr<=1))warn(`${where}：「必要な割合」は0より大きく100%以下にしてください（条件なしになります）`);
+      else{s.needFace=nf;s.needCount=nc===undefined?1:nc;if(nr!==undefined)s.needRatio=nr}
+    }
+    s.calc=s.needFace?withFaceNeed(calc,s.needFace,s.needCount,s.needRatio):calc;
+    skills.push(s);
+  }
+  for(const id of Object.keys(SKILL_FX))if(!seen.has(id))warn(`スキルの効果「${id}」に対応する行が、スキルシートにありません`);
+  if(!skills.length)throw new Error('スキルシートにデータがありません');
+  // --- 目の役割（シートがなければ初期値）
+  if(T['目の役割']){
+    const roles={},rows=T['目の役割'],head=(rows[0]||[]).map(h=>blank(h)?'':String(h).trim());
+    for(const row of rows.slice(1)){
+      const o={};head.forEach((h,c)=>{if(h&&!blank(row[c]))o[h]=row[c]});
+      const f=num(o['目']);if(f===undefined||!Number.isInteger(f)||f<1)continue;
+      const base=ROLE_DEFAULT[f]||{name:'',icon:'',desc:''};
+      roles[f]={name:str(o['役割'])||base.name,icon:str(o['アイコン'])||base.icon,desc:str(o['説明'])||base.desc,a:num(o['効果量1'])||0,b:num(o['効果量2'])||0,c:num(o['効果量3'])||0};
+    }
+    if(Object.keys(roles).length)ROLE=roles;
+  }else warn('「目の役割」シートがないため、初期値を使います');
+  // 沈黙中は魔法が使えない（敵の状態異常。js/pstatus.js）
+  for(const s of skills){
+    if(s.type!=='mag')continue;
+    const c0=s.calc;
+    s.calc=P=>{const r=c0(P);return (typeof p!=='undefined'&&p&&p.st&&p.st.silence)?Object.assign({},r,{ok:false,needText:'沈黙中（魔法が使えない）'}):r};
+  }
+  // --- 反映
+  DICE_T=dice;ITEMS=items;SKILLS=skills;
+  ITEM_BY=Object.fromEntries(ITEMS.map(i=>[i.id,i]));
+  SKILL_BY=Object.fromEntries(SKILLS.map(s=>[s.id,s]));
+  ALL=Object.fromEntries([...BASE,...SKILLS].map(s=>[s.id,s]));
+}
+
+const EMBEDDED_XLSX='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';
+async function loadData(){
+  const bin=atob(EMBEDDED_XLSX);
+  buildData(await readXlsx(Uint8Array.from(bin,c=>c.charCodeAt(0)).buffer));
+}
+async function bootGame(){
+  showOv('ちいさな迷宮 ダイス版','データを読み込み中…','');
+  try{await loadData()}
+  catch(err){
+    console.error(err);
+    showOv('データを読み込めませんでした',String(err.message||err),'<button class="card go" id="reloadBtn"><span class="ct" style="justify-content:center"><b>再読み込み</b></span></button>');
+    $('#reloadBtn').onclick=()=>location.reload();
+    return;
+  }
+  titleScreen();
+}
+// タイトル画面の下に出す、データ表の警告（あれば）
+const dataWarnNote=()=>DATA_WARNINGS.length?`<p class="sub" style="margin:10px 0 0;color:var(--exp)">データ表に注意が${DATA_WARNINGS.length}件あります：${DATA_WARNINGS.slice(0,3).join(' ／ ')}${DATA_WARNINGS.length>3?' ほか（詳しくはブラウザのコンソール）':''}</p>`:'';
+
+/* ===== ちいさな迷宮 ダイス版：メイン =====
+   ゲームの進行（戦闘・お店・イベント・報酬・セーブ・表示）。
+   ほかのファイル：enemies.js（敵） / dice.js（ダイス） / equipment.js・equipment_fx.js（装備） /
+   skills.js・skills_fx.js（スキル） / codex.js（図鑑） / data.js・xlsx-reader.js（Excelデータの読み込み） */
+const $=s=>document.querySelector(s);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const rnd=n=>Math.floor(Math.random()*n);
+const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+
+/* ===== 調整用の数値 ===== */
+const CFG={hp:80,mp:10,floorHp:6,floorMp:1,winHeal:0.2,winMp:4,dice:4,actions:3,rerolls:3,hp0:55,hpGrow:1.24,atk0:7,atkGrow:1.21,hpGrow2:1.16,atkGrow2:1.12,hpJump:1.35,atkJump:1.18,
+  endlessSpeed:2,
+  // 状態異常のコンボ
+  comboVapor:3,        // 蒸発：凍結中の敵に火傷を付けたときの、即時ダメージの倍率（凍結は解ける）
+  comboWound:1.5,      // 重症：毒と出血の両方が付いているときの、毒のダメージの倍率
+  comboStun:1.3,       // 気絶：スタン中の敵へのダメージの倍率
+  // 味方がかかる状態異常（js/pstatus.js）
+  pstChance:0.4,       // 敵の攻撃でHPにダメージが入ったときに、状態異常がかかる確率（通常の敵）
+  pstChanceBoss:0.6,   // 同（ボス）
+  pstPoisonPct:0.05,   // 毒：ラウンドの終わりに受ける、最大HPに対する割合（3ターン）
+  pstWeakMul:0.7,      // 弱体：与えるダメージの倍率
+  poisonCap:0.12,     // 毒が重なったときの上限（敵の最大HPに対する、毎ターンのダメージ割合。0.12＝12%）
+  enemySpeedStep:6,   // 敵の速さが+1される階数の間隔（階数÷この値、切り捨て）
+  floorHpMul:1.08};   // 階をクリアするたびの最大HPの伸び（掛け算）。1にすると従来（+6ずつ）のみ   // 21階以降（エンドレス）で敵が強くなる速さ。2＝従来の2倍速（伸び方の指数を2倍）、1＝従来どおり、3＝3倍速
+
+/* ===== 状態 ===== */
+let p,e,stage,busy,logLines=[],curShop=null,fullLog=[],turnNo=0;
+const rec=(t,k)=>{fullLog.push({t,k:k||'s'});if(fullLog.length>700)fullLog.splice(0,fullLog.length-700)};
+const has=id=>p.passives.includes(id);
+const pm=()=>has('power')?1.2:1;
+const R=x=>Math.round(x);
+const UNITS=[[1e12,'兆'],[1e8,'億'],[1e4,'万']];
+const BIG=1e300;                                   // 数値が無限大にならないための技術的な上限（ゲームの上限ではない）
+const cl=x=>Number.isFinite(x)?Math.min(x,BIG):BIG;
+function fmt(n){
+  if(!Number.isFinite(n))return n>0?'∞':String(n);
+  n=Math.round(n);const a=Math.abs(n);
+  if(a<10000)return String(n);
+  if(a>=1e16){const [m,x]=n.toExponential(2).split('e');return m.replace(/\.?0+$/,'')+'e'+x.replace('+','')}
+  for(const [u,sx] of UNITS){if(a>=u){const v=n/u;return (v>=100?String(Math.round(v)):v.toFixed(1).replace(/\.0$/,''))+sx}}
+  return String(n);
+}
+const fmtM=x=>x>=10000?fmt(x):String(+(+x).toFixed(2));
+let bestCache={floor:0,maxHit:0};
+function loadBest(){try{const d=JSON.parse(localStorage.getItem(BEST_KEY)||'null');if(d&&Number.isFinite(d.floor)&&Number.isFinite(d.maxHit))return d}catch(_){}return {floor:0,maxHit:0}}
+function saveBest(){
+  if(!p)return bestCache;
+  const b=loadBest();let ch=false;
+  if(stage+1>b.floor){b.floor=stage+1;ch=true}
+  if((p.maxHit||0)>b.maxHit){b.maxHit=p.maxHit;ch=true}
+  bestCache=b;
+  if(ch){try{localStorage.setItem(BEST_KEY,JSON.stringify(b))}catch(_){}}
+  return b;
+}
+const dmgOf=x=>Math.max(1,R(x));
+const layerOf=i=>LAYERS[Math.floor((i%FLOORS)/5)];
+const pr=x=>Math.round(x*(1+0.6*tierOf(stage)));   // インフレで値段も上がる
+
+/* ===== セーブ（この端末のブラウザに、プロフィールごとに保存。保存先のキーは profiles.js） ===== */
+let canSave=true;
+try{localStorage.setItem(SAVE_KEY+'-t','1');localStorage.removeItem(SAVE_KEY+'-t')}catch(_){canSave=false}
+function loadSave(){
+  try{
+    const t=localStorage.getItem(SAVE_KEY);if(!t)return null;
+    const d=JSON.parse(t);
+    if(!d||d.v!==4||!d.p||!Number.isFinite(d.next))return null;
+    return d;
+  }catch(_){return null}
+}
+function clearSave(){try{localStorage.removeItem(SAVE_KEY)}catch(_){}}
+function persist(next,shopPending,quiet){
+  if(next>=FLOORS&&!p.endless)return;
+  const q=p;
+  try{
+    localStorage.setItem(SAVE_KEY,JSON.stringify({v:4,next,shopPending:!!shopPending,
+      p:{hp:q.hp,maxHp:q.maxHp,mp:q.mp,maxMp:q.maxMp,gold:q.gold,skills:q.skills,passives:q.passives,slots:q.slots,equip:q.equip,endless:!!q.endless,maxHit:q.maxHit||0,cds:q.cds||{}}}));
+    if(!quiet)log('自動セーブしました。');
+  }catch(_){canSave=false}
+}
+function restoreP(d){
+  const n=(x,def)=>Number.isFinite(x)?x:def;
+  const sk=(d.skills||[]).filter(id=>SKILL_BY[id]);
+  const sl=(d.slots||[]).filter(t=>DICE_T[t]);
+  return {hp:n(d.hp,CFG.hp),maxHp:n(d.maxHp,CFG.hp),mp:n(d.mp,CFG.mp),maxMp:n(d.maxMp,CFG.mp),gold:n(d.gold,0),
+    skills:sk.length?sk:['smash','fire'],passives:(d.passives||[]).filter(id=>PASSIVE_BY[id]),
+    slots:sl.length?sl:Array(CFG.dice).fill('normal'),
+    equip:restoreEquip(d.equip),endless:!!d.endless,maxHit:n(d.maxHit,0),cds:restoreCds(d.cds),cdFresh:{},chain:0,revived:false,hot:null,rerollsUsed:0,bank:0,actionsBase:0,actionsUsed:0,rerollsBase:0,queue:[],st:{poison:null,stun:0,weak:0,silence:0},stNext:{stun:0,weak:0,silence:0},
+    shield:0,barrier:0,used:{},dice:[],locked:new Set(),rerolls:0,actions:CFG.actions,actionsLeft:0,dbl:false,berserk:0,wrath:0,starPower:0,undyingCharges:0,currentSkill:null};
+}
+function restoreCds(q){
+  const o={};
+  if(q&&typeof q==='object')for(const k of Object.keys(q)){if(SKILL_BY[k]&&Number.isFinite(q[k])&&q[k]>0)o[k]=Math.min(9,Math.floor(q[k]))}
+  return o;
+}
+function restoreEquip(q){
+  if(!Array.isArray(q)||!q.length)return baseSlots();
+  const out=[];
+  for(const x of q){
+    if(!x||!SLOT_ORDER.includes(x.t))continue;
+    const it=x.id&&ITEM_BY[x.id];
+    out.push({t:x.t,id:(it&&it.slot===x.t)?x.id:null});
+  }
+  return out.length?out:baseSlots();
+}
+
+/* ===== 表示まわり ===== */
+function log(t,noRec){
+  if(!noRec)rec(t,'s');
+  logLines.push(t);if(logLines.length>40)logLines.shift();
+  $('#log').innerHTML=logLines.slice(-4).map((l,i,a)=>`<div class="${i===a.length-1?'new':''}">${l}</div>`).join('');
+}
+function popup(where,text,cls){
+  const host=where==='pl'?$('#pl'):$('#scene');
+  const s=document.createElement('span');s.className='pop '+cls;s.textContent=text;
+  host.appendChild(s);setTimeout(()=>s.remove(),900);
+}
+function retrigger(el,cls){el.classList.remove(cls);void el.offsetWidth;el.classList.add(cls)}
+const shake=big=>{const a=$('#eart');a.classList.remove('shake','shakebig');void a.offsetWidth;a.classList.add(big?'shakebig':'shake')};
+const flash=()=>retrigger($('#pl'),'flash');
+
+function enemyNextDmg(){
+  const a=e.pat[e.idx%e.pat.length];
+  let d=Math.round(e.atk*a.m);
+  if(d>0&&has('armor'))d=Math.max(1,R(d*.85));
+  if(d>0)d=Math.max(1,R(d*takeMul()*roleTakeMul(p.execP||pool())));   // 耐久（2）の目で軽減
+  if(d>0&&e.weak)d=Math.ceil(d*(e.weakMul||0.5));
+  return d;
+}
+// 敵の耐性・弱点の表示（無効／耐性／弱点）
+function resChips(){
+  const g={0:[],0.5:[],1.5:[]};
+  for(const [k,v] of Object.entries(e.res||{}))if(g[v]&&STATUS_NAME[k])g[v].push(STATUS_NAME[k]);
+  return [[0,'🚫無効'],[0.5,'🛡耐性'],[1.5,'🎯弱点']].filter(([v])=>g[v].length).map(([v,l])=>`<span class="chip">${l}：${g[v].join('・')}</span>`).join('');
+}
+function intentText(){
+  if(e.hp<=0)return '';
+  if(e.frozen)return '凍りついて動けない…';
+  if(e.stun>0)return 'スタンして動けない…';
+  const a=e.pat[e.idx%e.pat.length];
+  return a.m===0?`次の行動：<b>${a.n}</b>（攻撃してこない）`:`次の行動：<b>${a.n}</b>（約${fmt(enemyNextDmg())}ダメージ${a.st&&PST[a.st]?`・${PST[a.st].icon}${PST[a.st].name}の恐れ`:''}）`;
+}
+function face(v){
+  const on={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]}[v];
+  if(!on)return `<span class="big">${v}</span>`;
+  return `<span class="face">${Array.from({length:9},(_,i)=>`<i class="${on.includes(i)?'on':''}"></i>`).join('')}</span>`;
+}
+function diceHTML(){
+  const P=pool(),maxF=Math.max(6,...p.slots.map(t=>Math.max(...DICE_T[t].faces))),colN=maxF>8?Math.ceil(maxF/2):maxF;   // 出る目の最大値ぶん集計欄を作る（9以上は2段に折り返す）
+  const cols=[];
+  for(let f=1;f<=maxF;f++){
+    const c=P.cnt[f]||0,lock=p.locked.has(f),top=P.M>=2&&c===P.M;
+    cols.push(`<button class="tcol ${c?'':'zero'} ${lock?'lock':''} ${top?'top':''} ${p.rolling?'roll':''}" data-f="${f}" aria-label="${f}の目 ${c}個${lock?' キープ中':''}"><span class="mini">${face(f)}</span><span class="role">${ROLE[f]?ROLE[f].icon:'　'}</span><span class="cnt">×${c}</span><span class="keep">${lock?'キープ':top?'最多':'　'}</span></button>`);
+  }
+  const sp={};p.slots.forEach(t=>{if(t!=='normal')sp[t]=(sp[t]||0)+1});
+  const chips=Object.keys(sp).map(t=>`<span class="chip">${DICE_T[t].name}×${sp[t]}</span>`).join('');
+  const un=p.rerolls>0&&p.dice.some(d=>!p.locked.has(d.v));
+  const dbl=p.dbl?'<span class="chip">ダブルアップ待機</span>':'';
+  return `<div class="dhead"><span>ダイス ${p.dice.length||p.slots.length}個 ／ 行動 <b>${p.actionsLeft}</b>/${p.actions}</span><span class="dbtns"><button class="sbtn" data-x="reroll" ${un?'':'disabled'}>振り直し ${p.rerolls}</button><button class="sbtn" data-x="end">${p.queue&&p.queue.length?'行動を実行':'ターン終了'}</button><button class="sbtn" data-x="log">ログ</button><button class="sbtn" data-x="home">ホーム</button></span></div>
+  <div class="tally" style="--cols:${colN}">${cols.join('')}</div>
+  <div class="roles">${roleSummary(P).map(s=>`<span class="chip">${s}</span>`).join('')||'<span class="sub">目の役割：役割のある目（1〜6）を伸ばすと効果が出る</span>'}</div>
+  <div class="score"><span>合計 <b>${fmt(P.S)}</b></span><span>×</span><span>揃い <b>${fmtM(P.mult)}</b>${P.jack?' <i class="jp">JACKPOT!</i>':''}</span><span>＝</span><b class="tot">${fmt(R(P.S*P.mult))}</b></div>
+  <div class="sub" style="text-align:center">装備込みで、こうげきは約<b style="font-weight:normal;color:var(--exp)">${fmt(previewFinal(P.S*P.mult,P))}</b>ダメージ</div>
+  <div class="hint">${chips||''}${dbl}${chips||dbl?'<br>':''}キープできる目は1種類だけ。タップでキープ → 振り直しで残りを振る。</div>`;
+}
+function actBtn(a){
+  const P=pool(),r=a.calc(P);
+  const usedA=!!p.used[a.id],cost=Math.max(0,(a.mp||0)-equipped().reduce((n,it)=>n+(it.mpDiscount||0),0)),okM=!cost||p.mp-reservedMp()>=cost,noAct=p.actionsLeft<=0;
+  const cdn=(p.cds&&p.cds[a.id])||0;
+  const dis=noAct||usedA||cdn>0||!r.ok||!okM;
+  const top=[a.mp?`MP${Math.max(0,a.mp-equipped().reduce((n,it)=>n+(it.mpDiscount||0),0))}`:'',a.cd?`待機${a.cd}`:''].filter(Boolean).join(' ／ ');
+  const res=usedA?(p.queue.some(q=>q.id===a.id)?'予約済み':'使用済み'):cdn>0?`あと${cdn}ターン使えない`:!r.ok?(r.needText||a.need||'使えない'):!okM?'MPが足りない':labelOf(r,P,a);
+  return `<button class="cb" data-a="${a.id}" ${dis?'disabled':''}><span class="nm">${a.name}</span>${top?`<span class="in">${top}</span>`:''}<span class="in res">${res}</span></button>`;
+}
+function cmdHTML(){
+  const atk=p.skills.map(id=>SKILL_BY[id]).filter(s=>s.type==='atk');
+  const mag=p.skills.map(id=>SKILL_BY[id]).filter(s=>s.type==='mag');
+  let h=timelineHTML()+`<div class="grp">行動を選んで予約（各行動は1ターンに1回）</div><div class="grid">${BASE.map(actBtn).join('')}</div>`;
+  if(atk.length)h+=`<div class="grp">スキル</div><div class="grid">${atk.map(actBtn).join('')}</div>`;
+  if(mag.length)h+=`<div class="grp">まほう（MPを使う）</div><div class="grid">${mag.map(actBtn).join('')}</div>`;
+  return h;
+}
+function render(){
+  codexSync();
+  const L=layerOf(stage);
+  $('#depth').textContent=`地下${stage+1}階`;
+  $('#layer').textContent=L.name+(tierOf(stage)?`・インフレ${tierOf(stage)}`:'');
+  $('#stg').className='stage '+L.cls;
+  $('#pips').innerHTML=ENEMIES.map((x,i)=>`<i class="pip ${x.boss?'boss':''} ${i<stage%FLOORS?'done':i===stage%FLOORS?'now':''}"></i>`).join('');
+  $('#ename').textContent=(e.boss?'【ボス】':'')+e.name;
+  const eh=Math.max(0,e.hp);
+  $('#ehp').style.width=(eh/e.maxHp*100)+'%';
+  $('#ebar').classList.toggle('low',eh/e.maxHp<=.3);
+  $('#ehpTxt').textContent=`HP ${fmt(eh)}/${fmt(e.maxHp)}`;
+  $('#estatus').innerHTML=`<span class="chip">速さ ${e.spd}</span>`+resChips()+(e.poison&&e.bleed?`<span class="chip">💥重症</span>`:'')+(e.poison?`<span class="chip">毒 ${fmtM(+(e.poison.pct*100).toFixed(1))}%×${e.poison.t}</span>`:'')+(e.burn?`<span class="chip">🔥火傷 ${e.burn.d}×${e.burn.t}</span>`:'')+(e.bleed?`<span class="chip">🩸出血 ${fmt(e.bleed.d)}×${e.bleed.t}回</span>`:'')+(e.frozen?`<span class="chip">凍結</span>`:'')+(e.stun?`<span class="chip">スタン</span>`:'')+(e.weak?`<span class="chip">弱体</span>`:'')+(e.vulnerable?`<span class="chip">被ダメ増加</span>`:'');
+  $('#intent').innerHTML=intentText();
+
+  $('#lv').textContent=`ダイス${p.slots.length}個`;
+  $('#gold').textContent=`${fmt(p.gold)}G`;
+  $('#rec').textContent=`最大ダメージ ${fmt(p.maxHit||0)}（自己ベスト ${fmt(Math.max(bestCache.maxHit,p.maxHit||0))}）`;
+  $('#hp').style.width=(p.hp/p.maxHp*100)+'%';
+  $('#hpbar').classList.toggle('low',p.hp/p.maxHp<=.3);
+  $('#hpTxt').textContent=`${fmt(p.hp)}/${fmt(p.maxHp)}`;
+  $('#mp').style.width=(p.mp/p.maxMp*100)+'%';
+  $('#mpTxt').textContent=`${p.mp}/${p.maxMp}`;
+  $('#chips').innerHTML=p.passives.map(id=>`<span class="chip" title="${PASSIVE_BY[id].desc}">${PASSIVE_BY[id].name}</span>`).join('')
+    +(p.shield>0?`<span class="chip">シールド ${p.shield}</span>`:'')+pstChips()+(p.barrier>0?`<span class="chip">バリア ${p.barrier}</span>`:'');
+  $('#equip').innerHTML=equipHTML();
+  $('#dice').innerHTML=diceHTML();
+  $('#cmd').innerHTML=cmdHTML();
+}
+
+/* ===== オーバーレイ ===== */
+function showOv(title,sub,body){
+  $('#ovT').textContent=title;$('#ovS').innerHTML=sub;$('#ovB').innerHTML=body;
+  $('#ov').hidden=false;const b=$('#ovB button:not([disabled])');if(b)b.focus();
+}
+const hideOv=()=>{$('#ov').hidden=true};
+function pickRaw(title,sub,html){
+  return new Promise(res=>{
+    showOv(title,sub,html);
+    $('#ovB').onclick=ev=>{
+      const b=ev.target.closest('button[data-i]');if(!b||b.disabled)return;
+      $('#ovB').onclick=null;hideOv();res(b.dataset.i);
+    };
+  });
+}
+async function pick(title,sub,opts){
+  codexSee(opts);
+  const i=await pickRaw(title,sub,opts.map((o,i)=>`<button class="card ${o.cls||''}" data-i="${i}"><span class="ct"><b>${o.name}${markHTML(o)}</b><em>${o.tag}</em></span><span class="cd">${o.desc}</span></button>`).join(''));
+  return opts[+i];
+}
+function screen(title,sub,extra,btn,fn){
+  showOv(title,sub,`${extra}<button class="card go" id="go"><span class="ct" style="justify-content:center"><b>${btn}</b></span></button>`);
+  $('#go').onclick=()=>{hideOv();fn()};
+}
+
+/* ===== ダイスを振る ===== */
+const rollFace=t=>{const f=DICE_T[t].faces;return f[rnd(f.length)]};
+async function rollAnim(idx){
+  p.rolling=true;
+  for(let f=0;f<6;f++){idx.forEach(i=>{p.dice[i].v=rollFace(p.dice[i].t)});render();await sleep(80)}
+  p.rolling=false;
+}
+// 速さ（1）の目の個数に応じて、振り直し回数と行動回数を決め直す（出目が変わるたびに呼ぶ）
+function syncRoleBonuses(){
+  if(!p||!p.dice||!p.dice.length)return;
+  const P=pool();
+  p.actions=p.actionsBase+roleActionBonus(P);p.actionsLeft=Math.max(0,p.actions-p.actionsUsed);
+  p.rerolls=Math.max(0,p.rerollsBase+roleRerollBonus(P)-p.rerollsUsed);
+}
+async function startTurn(){
+  p.used={};p.queue=[];p.execP=null;p.actions=Math.max(1,CFG.actions+(has('actions')?1:0)+equipped().reduce((a,it)=>a+(it.actions||0),0)-(p.st&&p.st.stun?1:0));p.actionsLeft=p.actions;p.actionsBase=p.actions;p.actionsUsed=0;
+  p.rerolls=CFG.rerolls+(has('reroll')?1:0);p.rerollsBase=p.rerolls;p.locked=new Set();p.rerollsUsed=0;
+  p.dice=[...p.slots,...Array(p.battleDiceBonus||0).fill('normal')].map(t=>({t,v:1}));
+  await rollAnim(p.dice.map((_,i)=>i));
+  syncRoleBonuses();
+  const g=p.dice.filter(d=>d.t==='gold').reduce((a,d)=>a+d.v,0);
+  if(g){p.gold+=g;log(`金のダイスが${g}Gを生んだ！`);popup('pl','+'+g+'G','gold')}
+  const lucky=p.dice.filter(d=>d.t==='lucky').reduce((a,d)=>a+(d.v===8?2:0),0);
+  if(lucky){p.gold+=lucky;log(`幸運ダイスの8がボーナス${lucky}Gを生んだ！`)}
+  turnNo++;rec(`── ターン${turnNo} ──`,'turn');
+  rec(`【ダイス】${p.slots.length}個を振った → ${tallyText()}`,'roll');
+  const spc={};p.slots.forEach(t=>{if(t!=='normal')spc[t]=(spc[t]||0)+1});
+  if(Object.keys(spc).length)rec(`　特殊ダイス：${Object.keys(spc).map(t=>DICE_T[t].name+'×'+spc[t]).join('、')}`,'roll');
+  const P0=pool();rec(`　合計${P0.S}／最多${P0.M}個／揃い×${P0.mult}${P0.jack?'（ジャックポット）':''}／ペア${P0.pairs}組／最長連続${P0.run}`,'roll');
+  log(`出目：${tallyText()}`,true);
+  render();
+  await turnStartItems();
+}
+async function reroll(){
+  const idx=p.dice.map((d,i)=>p.locked.has(d.v)?-1:i).filter(i=>i>=0);
+  if(p.rerolls<=0||!idx.length)return;
+  busy=true;p.rerolls--;p.rerollsUsed++;
+  const before=tallyText(),lf=[...p.locked][0];
+  await rollAnim(idx);
+  syncRoleBonuses();
+  rec(`【振り直し】${lf?lf+'の目をキープして、':'キープなしで、'}${idx.length}個を振り直した（残り${p.rerolls}回）`,'roll');
+  rec(`　前：${before}`,'roll');rec(`　後：${tallyText()}`,'roll');
+  log(`振り直し：${tallyText()}`,true);
+  busy=false;render();
+}
+
+/* ===== 戦闘 ===== */
+async function hit(amount){
+  let d=Math.max(1,R(cl(amount)));
+  if(e.vulnerable){const vm=e.vulnMul||1.5;d=R(d*vm);e.vulnerable=false;log(`${e.name}の隙を突いた！ダメージ${fmtM(+vm.toFixed(2))}倍！`)}
+  if(e.stun>0){d=R(d*CFG.comboStun);log(`💫気絶中の${e.name}に追撃！ダメージ×${CFG.comboStun}`)}   // コンボ：気絶ボーナス
+  const big=d>=e.maxHp*.25;
+  e.hp=Math.max(0,e.hp-d);
+  if(d>(p.maxHit||0)){p.maxHit=d}
+  log(`${e.name}に${fmt(d)}のダメージ！`);popup('scene',fmt(d),big?'dmg big':'dmg');shake(big);render();
+  await sleep(big?520:380);
+  return d;
+}
+function healP(n){
+  const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+n);
+  const g=p.hp-before;log(`HPが${g}回復した。`);popup('pl','+'+g,'heal');render();
+}
+// 敵に状態異常を付ける（スキルの結果 r と、装備の「攻撃時の状態異常」の両方から使う）。keep=true なら、すでにある毒・火傷・出血より弱くならない
+// 状態異常を付ける。火傷・出血の強さは「base（その行動が与えたダメージ）× r.burn / r.bleed（割合）」。毒は「敵の最大HP × r.poison（割合）」
+// --- 敵の耐性・弱点（enemies.js の res。0＝無効／0.5＝耐性／1.5＝弱点）
+const STATUS_NAME={poison:'毒',burn:'火傷',bleed:'出血',stun:'スタン',freeze:'凍結',weaken:'弱体',vulnerable:'弱点看破'};
+const resOf=k=>{const v=e.res&&e.res[k];return v===undefined?1:v};
+// 状態異常が通るかを調べる。無効なら false。耐性は、かかる／かからないの状態異常（スタン・凍結・弱体・弱点看破）では、確率で防ぐ
+function resistCheck(kind){
+  const rm=resOf(kind),nm=STATUS_NAME[kind];
+  if(rm===0){log(`${e.name}には${nm}が効かない！`,true);rec(`　${nm}：無効`,'act');return false}
+  if(rm<1&&['stun','freeze','weaken','vulnerable'].includes(kind)&&!(Math.random()<rm)){log(`${e.name}は${nm}に耐えた！`,true);rec(`　${nm}：耐性で防がれた`,'act');return false}
+  return true;
+}
+const resNote=k=>{const rm=resOf(k);return rm<1&&rm>0?'（耐性で半減）':rm>1?'（弱点！）':''};
+function applyStatuses(r,keep,P,base){
+  const P2=P||pool(),sm=roleStatusMul(P2),dur=roleStatusDuration(P2),wm=roleWeakMul(P2),vm=roleVulnMul(P2);   // 技巧（5）の目：状態異常が強くなり、毒・火傷・出血は長く続く
+  // 毒：敵の最大HPの％を、毎ターン。重ねがけで割合が増える（上限 CFG.poisonCap）。長引く戦い（ボス）向け
+  if(r.poison&&resistCheck('poison')){
+    const pmul=equipped().reduce((m,it)=>m*(it.poisonMul||1),1),cur=e.poison;
+    e.poison={t:Math.max(3+dur,cur?cur.t:0),pct:Math.min(CFG.poisonCap,(cur?cur.pct:0)+r.poison*pmul*sm*resOf('poison'))};
+    log(`${e.name}は毒に侵された！（毎ターン最大HPの${fmtM(+(e.poison.pct*100).toFixed(1))}%）${resNote('poison')}`);codexStatus('poison');render();
+  }
+  // 火傷：付与した瞬間に1回分のダメージが入り、そのあと2ターン続く（武器の連続付与では、火傷が付いていないときだけ即時ダメージ）
+  if(r.burn&&resistCheck('burn')){
+    const d=Math.max(1,R((base||0)*r.burn*sm*resOf('burn'))),cur=e.burn;
+    e.burn={t:2+dur,d:keep&&cur?Math.max(cur.d,d):d};
+    if(!keep||!cur){
+      const vapor=!!e.frozen,imm=vapor?Math.round(d*CFG.comboVapor):d;   // コンボ：蒸発（凍結中に火傷）
+      if(vapor){e.frozen=false;log(`💥蒸発！凍結が解けて、火傷の即時ダメージが×${CFG.comboVapor}！`,true)}
+      e.hp=Math.max(0,e.hp-imm);log(`${e.name}は火傷した！即座に${fmt(imm)}のダメージ！${resNote('burn')}`,true);popup('scene',imm,'dmg');rec(`　火傷：即時ダメージ${fmt(imm)}${vapor?'（蒸発）':''}`,'act')}
+    else log(`${e.name}の火傷が続く。`);
+    codexStatus('burn');render();
+  }
+  // 出血：敵がダメージを受けるたびに、追加ダメージ（時間では減らない）
+  if(r.bleed&&resistCheck('bleed')){
+    const d=Math.max(1,R((base||0)*r.bleed*sm*resOf('bleed'))),cur=e.bleed;
+    e.bleed={t:3+dur,d:keep&&cur?Math.max(cur.d,d):d};
+    log(`${e.name}は出血した！（ダメージを受けるたびに${fmt(d)}）${resNote('bleed')}`);codexStatus('bleed');render();
+  }
+  if(r.stun&&resistCheck('stun')){if(e.boss){e.weak=true;e.weakMul=wm;codexStatus('weak');log('ボスにはスタンが効かない！次の攻撃を弱体化！')}else{e.stun=1;codexStatus('stun');log(`${e.name}はスタンした！`)}render()}
+  if(r.vulnerable&&resistCheck('vulnerable')){const vm2=vm+(resOf('vulnerable')>1?0.25:0);e.vulnerable=true;e.vulnMul=vm2;log(`${e.name}の防御の隙を作った！次の攻撃の被ダメージ${fmtM(+vm2.toFixed(2))}倍！${resNote('vulnerable')}`);codexStatus('vulnerable');render()}
+  if(r.weaken&&resistCheck('weaken')){e.weak=true;e.weakMul=wm*(resOf('weaken')>1?0.8:1);log(`${e.name}の次の攻撃が弱まった！${resNote('weaken')}`);codexStatus('weak');render()}
+  if(r.freeze&&resistCheck('freeze')){
+    if(e.boss){e.weak=true;e.weakMul=wm;codexStatus('weak');log(`${e.name}の次の攻撃が弱まった！`)}
+    else if(!e.frozenUsed){e.frozen=true;e.frozenUsed=true;codexStatus('freeze');log(`${e.name}は凍りついた！`)}
+    else log(`${e.name}はもう凍らない！`);
+    render();
+  }
+}
+// 出血：敵がダメージを受けるたびに、追加ダメージ（付与した行動そのもののダメージでは発動しない）
+async function bleedTrigger(){
+  const st=e.bleed;if(!st||e.hp<=0)return;
+  const d=st.d;e.hp=Math.max(0,e.hp-d);st.t--;if(st.t<=0)e.bleed=null;
+  rec(`【出血】${e.name}に出血ダメージ${fmt(d)}`,'take');log(`出血で${e.name}に${fmt(d)}のダメージ！`,true);popup('scene',d,'dmg');render();await sleep(220);
+}
+async function apply(r,P){
+  if(r.gold){p.gold+=r.gold;log(`ゴールドレイン：${fmt(r.gold)}Gを得た！`);popup('pl','+'+fmt(r.gold)+'G','gold');render();}
+  if(r.hpCost){p.hp=Math.max(1,p.hp-r.hpCost);log(`HPを${r.hpCost}支払った。`);popup('pl','-'+r.hpCost,'hurt');render();await sleep(250)}
+  if(r.dbl){p.dbl=true;log('次のダメージが2倍になる！');render();await sleep(300)}
+  let dealt=0;
+  if(r.dmg){const res=runPipeline(r.dmg,P,false,ALL[p.currentSkill]);await cascade(res,r.note);let fin=res.final;const cc=roleCritChance(P);if(cc>0&&Math.random()<cc){fin=Math.max(1,R(fin*roleCritMul()));log('💥会心！',true);rec(`　会心！ダメージ×${fmtM(roleCritMul())}`,'act');popup('scene','会心！','dmg')}   // 会心（3）の目
+    const d=await hit(fin);dealt=d;p.dbl=false;p.bank=0;if(equipped().some(it=>it.id==='chainorb'))p.chain=(p.chain||0)+1;if(r.drain&&d>0)healP(d);for(const it of equipped()){if(it.hit){const h=it.hit(d);if(h&&h.heal){p.hot=it.id;healP(h.heal)}}}p.hot=null}
+  if(dealt>0&&e.bleed&&e.hp>0)await bleedTrigger();
+  if(e.hp<=0)return;
+  applyStatuses(r,false,P,dealt);
+  if(dealt>0)itemStatusOnHit(dealt,P);
+  if(r.heal){healP(r.heal);await sleep(300)}
+  if(r.shield){
+    let sh=r.shield;
+    if(r.isGuard){const g=guardFinal(r.shield,P);if(g.steps.length)await cascade(g,r.note);sh=g.final}
+    p.shield+=sh;log(`シールドを${sh}張った。`);render();await sleep(300);
+  }
+  if(r.barrier){p.barrier+=r.barrier;log(`バリアを${r.barrier}張った。`);render();await sleep(300)}
+}
+async function startBattle(){
+  const t=tpl(stage),f=stage+1,tier=tierOf(stage);
+  e={...t,name:tierPrefix(stage)+t.name,hp:enemyHp(stage,t),atk:enemyAtk(stage,t),idx:0,spd:enemySpeed(stage,t),frozen:false,frozenUsed:false,weak:false,poison:null,burn:null,bleed:null,stun:0,vulnerable:false};
+  e.maxHp=e.hp;
+  e.gold=Math.round((8+f*2)*(t.boss?3:1)*(t.goldx||1)*(1+0.6*tier)*(0.85+Math.random()*0.3));
+  p.cdFresh={};p.shield=0;p.barrier=0;p.bank=0;p.chain=0;p.revived=false;pstReset();p.used={};p.queue=[];p.dice=[];p.locked=new Set();p.dbl=false;p.actionsLeft=0;
+  turnNo=0;rec(`━━ 地下${stage+1}階：${e.name}（HP${fmt(e.hp)} 攻撃力${fmt(e.atk)}）━━`,'battle');
+  saveBest();
+  if(stage>0&&stage%5===0)log(`${layerOf(stage).name}${tier?'（インフレ'+tier+'）':''}に足を踏み入れた…`);
+  if(t.boss){p.hp=p.maxHp;p.mp=p.maxMp;log('ボスの部屋の前で休息した。HPとMPが全回復！')}
+  log(`${t.boss?'ボス ':''}${e.name}が現れた！`);
+  if(has('mpstart'))p.mp=Math.min(p.maxMp,p.mp+4);
+  p.berserk=0;p.wrath=0;p.starPower=0;p.battleDiceBonus=equipped().reduce((n,it)=>n+(it.battleDice||0),0);p.undyingCharges=equipped().reduce((n,it)=>n+(it.undying===true?1:(Number(it.undying)||0)),0);
+  for(const it of equipped()){if(it.battleStart){const z=it.battleStart();if(z.shield)p.shield+=z.shield;if(z.barrier)p.barrier+=z.barrier;}}
+  $('#eart').innerHTML=e.art();retrigger($('#eart'),'enter');
+  render();
+  await startTurn();
+}
+function endTurnCd(){
+  // そのターンに使ったスキルは数えない。使っていないスキルは、このターンを1ターンぶん進める。
+  for(const k of Object.keys(p.cds)){
+    if(!p.cdFresh[k]&&p.cds[k]>0)p.cds[k]--;
+    if(p.cds[k]<=0)delete p.cds[k];
+  }
+  p.cdFresh={};
+}
+// 行動の実行前に、魔力(4)の目でMPが回復する（「行動を実行」を押した時点の出目で）
+async function roleTurnEnd(){
+  const P=p.execP||pool(),parts=[];
+  const mp=roleMana(P);
+  if(mp>0&&p.mp<p.maxMp){const m=Math.min(mp,p.maxMp-p.mp);p.mp+=m;parts.push(`${ROLE[4].icon}MP+${m}`)}
+  const tk=roleTakeMul(P);
+  if(tk<1)parts.push(`${ROLE[2].icon}被ダメージ×${fmtM(+tk.toFixed(2))}`);
+  if(parts.length){log(`目の役割：${parts.join('　')}`,true);rec(`【目の役割】${parts.join('　')}`,'act');render();await sleep(250)}
+}
+async function enemyAct(){
+  if(e.stun>0){e.stun--;log(`${e.name}はスタンして動けない！`);render();await sleep(500);return}
+  if(e.frozen){e.frozen=false;log(`${e.name}は凍りついて動けない！`);render();await sleep(500);return}
+  const a=e.pat[e.idx%e.pat.length];e.idx++;
+  if(a.m===0){log(`${e.name}は${a.n}。`);render();await sleep(500);return}
+  log(`${e.name}の${a.n}！`,true);await sleep(320);
+  let d=Math.round(e.atk*a.m);
+  const dodger=equipped().find(it=>it.dodge&&Math.random()<it.dodge);if(dodger){log(`${dodger.name}で攻撃を回避した！`);render();await sleep(350);return}
+  rec(`【${e.name}の攻撃】${a.n}：攻撃力${fmt(e.atk)}×${a.m}＝${fmt(d)}`,'take');
+  if(has('armor')){d=Math.max(1,R(d*.85));rec(`　鉄の覚悟 ×0.85 → ${d}`,'take')}
+  for(const it of equipped()){if(it.take){const f=it.take();if(f!==1){d=Math.max(1,R(d*f));rec(`　${it.name} ×${f} → ${d}`,'take')}}}
+  const rt=roleTakeMul(p.execP||pool());if(rt<1){d=Math.max(1,R(d*rt));rec(`　${ROLE[2].icon}${ROLE[2].name}の目 ×${fmtM(+rt.toFixed(2))} → ${d}`,'take')}   // 耐久（2）の目：実行を押した時点の出目
+  if(e.weak){d=Math.ceil(d*(e.weakMul||0.5));e.weak=false;rec(`　弱体化で×${fmtM(+(e.weakMul||0.5).toFixed(2))} → ${d}`,'take')}
+  let blocked=0;
+  if(p.shield>0){const x=Math.min(p.shield,d);p.shield-=x;d-=x;blocked+=x;rec(`　シールドが${x}防いだ → 残り${d}`,'take');log(`シールドが${x}防いだ！`,true)}
+  if(d>0&&p.barrier>0){const x=Math.min(p.barrier,d);p.barrier-=x;d-=x;blocked+=x;rec(`　バリアが${x}防いだ → 残り${d}`,'take');log(`バリアが${x}防いだ！`,true)}
+  if(blocked>0&&equipped().some(it=>it.id==='bulwark')){p.bank+=blocked*0.3;log(`要塞の鎧：防いだ分を力に変えた。`)}
+  if(d>0){
+    p.hp=Math.max(0,p.hp-d);
+    if(p.hp<=0&&(p.undyingCharges||0)>0){p.undyingCharges--;p.hp=1;log('不死の加護でHP1で踏みとどまった！');popup('pl','耐えた','heal')}
+    for(const it of equipped()){if(it.onTaken){const h=it.onTaken(d);if(h>0&&p.hp>0){p.hp=Math.min(p.maxHp,p.hp+h);log(`${it.name}：HPが${h}回復！`)}}}
+    rec(`　▶ 勇者は${fmt(d)}のダメージ（HP ${fmt(p.hp)}/${fmt(p.maxHp)}）`,'take');
+    log(`勇者は${fmt(d)}のダメージを受けた！`,true);popup('pl','-'+fmt(d),'hurt');flash();
+    if(p.hp<=0&&!p.revived&&equipped().some(it=>it.id==='phoenix')){
+      p.revived=true;p.hp=Math.max(1,R(p.maxHp*.6));
+      rec(`　不死鳥の羽が輝いた！ HP ${fmt(p.hp)}で復活`,'take');log('不死鳥の羽が輝き、勇者は蘇った！');popup('pl','復活','heal');
+    }
+    if(p.hp>0)pstTry(a);   // HPにダメージが入ったときだけ、状態異常がかかることがある
+    if(p.hp>0){
+      for(const it of equipped()){
+        if(!it.reflect)continue;
+        const rf=R(it.reflect(d)*equipped().reduce((m,x)=>m*(x.refMul||1),1));
+        if(rf>0&&e.hp>0){e.hp=Math.max(0,e.hp-rf);p.hot=it.id;log(`${it.name}：${e.name}に${fmt(rf)}の反射ダメージ！`);popup('scene',fmt(rf),'dmg');render();await sleep(300);p.hot=null}
+      }
+    }
+  }else{rec('　▶ ダメージなし','take');popup('pl','0','miss');if(a.st&&blocked>0){rec('　シールドが状態異常も防いだ','take');log('防ぎきったので、状態異常はかからない！',true)}}
+  render();await sleep(450);
+}
+
+/* ===== お店 ===== */
+function makeStock(){
+  const items=[];
+  const add=o=>items.push({sold:false,...o});
+  add({id:'potion',name:'回復薬',price:pr(25),desc:'HPを最大HPの40%回復する。',ok:()=>p.hp<p.maxHp,buy:async()=>{healP(Math.round(p.maxHp*.4))}});
+  const extra=[
+   {id:'mpot',name:'魔力の薬',price:pr(25),desc:'MPを12回復する。',ok:()=>p.mp<p.maxMp,buy:async()=>{p.mp=Math.min(p.maxMp,p.mp+12)}},
+   {id:'hpup',name:'命の実',price:pr(60),desc:'最大HPが20増え、20回復する。',ok:()=>true,buy:async()=>{p.maxHp+=20;p.hp+=20}},
+   {id:'mpup',name:'魔力の実',price:pr(55),desc:'最大MPが5増え、5回復する。',ok:()=>true,buy:async()=>{p.maxMp+=5;p.mp+=5}},
+  ];
+  add(shuffle(extra)[0]);
+  add({id:'dice',name:'ダイス追加',price:pr(16+2*p.slots.length),desc:'ふつうのダイスを1個増やす。',ok:()=>true,buy:async()=>{p.slots.push('normal');log('ダイスが1個増えた！')}});
+  shuffle(Object.keys(DICE_T).filter(k=>k!=='normal'&&p.slots.length<18)).slice(0,2).forEach(k=>{
+    const t=DICE_T[k];
+    add({id:'d_'+k,name:t.name,price:pr(t.price),tag:'ダイス',desc:`${t.desc}ダイスが1個増える。`,ok:()=>true,buy:async()=>{p.slots.push(k);log(`${t.name}を手に入れた！`)}});
+  });
+  const eqs=shuffle(ITEMS.filter(it=>!it.leg&&!ownedItem(it.id)));
+  const rare=eqs.find(it=>it.rare),com=eqs.filter(it=>!it.rare);
+  [com[0],Math.random()<.5&&rare?rare:com[1]].filter(Boolean).forEach(it=>{
+    add({id:'i_'+it.id,name:it.name,price:pr(it.price),tag:`装備・${SLOT_TYPE[it.slot]}${it.rare?'・レア':''}`,desc:it.desc,ok:()=>true,buy:async()=>equipItem(it,true)});
+  });
+  if(Math.random()<0.06){
+    const lg=shuffle(ITEMS.filter(it=>it.leg&&!ownedItem(it.id)))[0];
+    if(lg)add({id:'i_'+lg.id,name:lg.name,price:pr(lg.price),leg:true,tag:`装備・${SLOT_TYPE[lg.slot]}・伝説`,desc:lg.desc,ok:()=>true,buy:async()=>equipItem(lg,true)});
+  }
+  const pool0=SKILLS.filter(s=>!p.skills.includes(s.id));
+  if(pool0.length){
+    const s=shuffle(pool0)[0];
+    add({id:'s_'+s.id,name:s.name,price:pr(70),tag:s.type==='atk'?'スキル':`魔法・MP${s.mp}`,desc:skDesc(s),ok:()=>true,buy:async()=>{p.skills.push(s.id)}});
+  }
+  return items;
+}
+function buildHTML(){
+  const eq=slotRows().map(r=>`<div class="eqrow"><span class="es">${r.nm}</span>${r.it?`<span><b style="font-weight:normal">${r.it.name}</b><br><span class="sub">${r.it.desc}</span></span>`:'<span class="sub">（空き）</span>'}${mvBtns(r.i,'shop')}</div>`).join('');
+  const sp={};p.slots.forEach(t=>{sp[t]=(sp[t]||0)+1});
+  const dice=Object.keys(sp).map(t=>`${DICE_T[t].name}×${sp[t]}`).join('、');
+  const sk=p.skills.map(id=>SKILL_BY[id].name).join('、')||'なし';
+  const ps=p.passives.map(id=>PASSIVE_BY[id].name).join('、')||'なし';
+  return `<div class="eqpanel">${eq}<div class="eqrow"><span class="es">ダイス</span><span>${dice}</span></div><div class="eqrow"><span class="es">スキル</span><span>${sk}</span></div><div class="eqrow"><span class="es">パッシブ</span><span>${ps}</span></div></div>`;
+}
+async function shop(){
+  log('旅の商人に出会った。');
+  const items=makeStock();curShop=items;codexSee(items);
+  let showBuild=false;
+  while(true){
+    const html=`<button class="card go" data-i="eq"><span class="ct" style="justify-content:center"><b>いまの装備・ビルドを見る ${showBuild?'▲':'▼'}</b></span></button>${showBuild?buildHTML():''}`+items.map((it,i)=>{
+      const dis=it.sold||p.gold<it.price||!it.ok();
+      return `<button class="card ${it.leg?'legend':''}" data-i="${i}" ${dis?'disabled':''}><span class="ct"><b>${it.name}${markHTML(it)}</b><em>${it.sold?'売り切れ':it.price+'G'}</em></span><span class="cd">${it.tag?it.tag+'：':''}${it.desc}</span></button>`;
+    }).join('')+`<button class="card go" data-i="leave"><span class="ct" style="justify-content:center"><b>店を出る</b></span></button>`;
+    const r=await pickRaw('旅の商人',`所持金 ${fmt(p.gold)}G ／ HP ${fmt(p.hp)}/${fmt(p.maxHp)} ／ MP ${p.mp}/${p.maxMp} ／ ダイス${p.slots.length}個`,html);
+    if(r==='leave')break;
+    if(r==='eq'){showBuild=!showBuild;continue}
+    if(String(r).startsWith('mv:')){moveSlot(String(r).slice(3));continue}
+    const it=items[+r];
+    if(!it||it.sold||p.gold<it.price||!it.ok())continue;
+    p.gold-=it.price;it.sold=true;
+    const res=await it.buy();
+    if(res===false){p.gold+=it.price;it.sold=false}
+    render();
+  }
+  curShop=null;
+}
+
+/* ===== ランダムイベント（ショップ以外の寄り道） ===== */
+async function randomEvent(){
+  const events=[
+    {title:'忘れられた宝箱',sub:'通路の隅に、古びた宝箱が置かれている。',opts:[
+      {name:'慎重に開ける',tag:'安全',desc:'少しだけゴールドを手に入れる。',apply:()=>{const g=pr(18+rnd(24));p.gold+=g;log(`宝箱から${fmt(g)}Gを見つけた。`)}},
+      {name:'力ずくでこじ開ける',tag:'危険',desc:'大金の可能性。ただし罠でHPを失うかも。',apply:()=>{const g=pr(35+rnd(55));p.gold+=g;log(`宝箱から${fmt(g)}Gを手に入れた！`);if(Math.random()<.4){const d=Math.max(1,R(p.maxHp*(.08+Math.random()*.12)));p.hp=Math.max(1,p.hp-d);log(`罠が作動！ HPを${fmt(d)}失った。`)}else log('罠は作動しなかった！')}},
+      {name:'立ち去る',tag:'やめる',desc:'何もせず先へ進む。',apply:()=>log('宝箱には手を出さず、先へ進んだ。')}
+    ]},
+    {title:'不思議な泉',sub:'青白く光る泉から、澄んだ水が湧いている。',opts:[
+      {name:'水を飲む',tag:'回復',desc:'HPを最大HPの35%、MPを4回復する。',apply:()=>{const h=Math.max(1,R(p.maxHp*.35));p.hp=Math.min(p.maxHp,p.hp+h);p.mp=Math.min(p.maxMp,p.mp+4);log(`泉の水でHPが${fmt(h)}、MPが回復した。`)}},
+      {name:'水を汲んで売る',tag:'お金',desc:'水を売ってゴールドを得る。',apply:()=>{const g=pr(28+rnd(22));p.gold+=g;log(`不思議な水を${fmt(g)}Gで売った。`)}},
+      {name:'泉に祈る',tag:'幸運',desc:'運が良ければ最大HPが少し増える。',apply:()=>{if(Math.random()<.7){p.maxHp+=12;p.hp=Math.min(p.maxHp,p.hp+12);log('泉の祝福！ 最大HPが12増えた。')}else{const d=Math.max(1,R(p.maxHp*.06));p.hp=Math.max(1,p.hp-d);log(`泉が泡立った……HPを${fmt(d)}失った。`)}}}
+    ]},
+    {title:'崩れかけた通路',sub:'天井から小石が落ちている。急いで通る？',opts:[
+      {name:'慎重に進む',tag:'安全',desc:'時間はかかるが、少量のゴールドを拾える。',apply:()=>{const g=pr(10+rnd(16));p.gold+=g;log(`慎重に進み、落ちていた${fmt(g)}Gを拾った。`)}},
+      {name:'走り抜ける',tag:'危険',desc:'成功すれば大きな報酬。失敗するとダメージ。',apply:()=>{if(Math.random()<.55){const g=pr(45+rnd(40));p.gold+=g;log(`素早く通り抜け、${fmt(g)}Gを見つけた！`)}else{const d=Math.max(1,R(p.maxHp*(.1+Math.random()*.1)));p.hp=Math.max(1,p.hp-d);log(`落石に当たった！ HPを${fmt(d)}失った。`)}}},
+      {name:'別の道を探す',tag:'回復',desc:'少し遠回りしてHPを10%回復する。',apply:()=>{const h=Math.max(1,R(p.maxHp*.1));p.hp=Math.min(p.maxHp,p.hp+h);log(`別の道を見つけ、HPが${fmt(h)}回復した。`)}}
+    ]},
+    {title:'旅する妖精',sub:'小さな妖精がくるくると飛び回っている。',opts:[
+      {name:'妖精に挨拶する',tag:'祝福',desc:'HPを回復し、少しだけMPも戻る。',apply:()=>{const h=Math.max(1,R(p.maxHp*.22));p.hp=Math.min(p.maxHp,p.hp+h);p.mp=Math.min(p.maxMp,p.mp+2);log(`妖精の祝福でHPが${fmt(h)}、MPが2回復した。`)}},
+      {name:'一緒に遊ぶ',tag:'ダイス',desc:'ふつうのダイスを1個もらう（最大18個）。',apply:()=>{if(p.slots.length<18){p.slots.push('normal');log('妖精からふつうのダイスを1個もらった！')}else{const g=pr(35);p.gold+=g;log(`ダイス袋がいっぱい！ お礼に${fmt(g)}Gをもらった。`)}}},
+      {name:'お礼を渡す',tag:'寄付',desc:'15Gを渡すと、最大MPが2増える。',apply:()=>{const cost=pr(15);if(p.gold>=cost){p.gold-=cost;p.maxMp+=2;p.mp=Math.min(p.maxMp,p.mp+2);log(`妖精に${fmt(cost)}Gを渡し、最大MPが2増えた。`)}else{const h=Math.max(1,R(p.maxHp*.08));p.hp=Math.min(p.maxHp,p.hp+h);log('お金が足りないので、妖精が少しだけHPを回復してくれた。')}}}
+    ]},
+    {title:'謎めいた祭壇',sub:'祭壇には「力を求める者は、何かを差し出せ」と刻まれている。',opts:[
+      {name:'体力を捧げる',tag:'強化',desc:'HPを最大HPの12%失う代わりに、最大HPが20増える。',apply:()=>{const d=Math.max(1,R(p.maxHp*.12));p.hp=Math.max(1,p.hp-d);p.maxHp+=20;log(`祭壇に体力を捧げ、最大HPが20増えた。HPを${fmt(d)}失った。`)}},
+      {name:'ゴールドを捧げる',tag:'強化',desc:'ゴールドを使い、最大MPを3増やす。',apply:()=>{const cost=pr(30);if(p.gold>=cost){p.gold-=cost;p.maxMp+=3;p.mp=Math.min(p.maxMp,p.mp+3);log(`祭壇に${fmt(cost)}Gを捧げ、最大MPが3増えた。`)}else{const g=pr(12);p.gold+=g;log('捧げ物が足りない。祭壇の隙間から少額のコインが出てきた。')}}},
+      {name:'祈って立ち去る',tag:'安全',desc:'少量のHPを回復する。',apply:()=>{const h=Math.max(1,R(p.maxHp*.12));p.hp=Math.min(p.maxHp,p.hp+h);log(`祈りが届き、HPが${fmt(h)}回復した。`)}}
+    ]},
+    {title:'迷子の冒険者',sub:'傷ついた冒険者が道に座り込んでいる。',opts:[
+      {name:'回復薬を分ける',tag:'親切',desc:'ゴールドを少し渡すと、お礼に装備資金をくれる。',apply:()=>{const cost=pr(12);if(p.gold>=cost){p.gold-=cost;const g=pr(38);p.gold+=g;log(`冒険者を助けた。お礼に${fmt(g)}Gを受け取った。`)}else{const h=Math.max(1,R(p.maxHp*.12));p.hp=Math.min(p.maxHp,p.hp+h);log('持ち合わせがなくても、冒険者は感謝してHPを回復してくれた。')}}},
+      {name:'情報を聞く',tag:'情報',desc:'次の戦いに備えてHPを少し回復する。',apply:()=>{const h=Math.max(1,R(p.maxHp*.15));p.hp=Math.min(p.maxHp,p.hp+h);log(`冒険者の助言を聞き、HPが${fmt(h)}回復した。`)}},
+      {name:'先を急ぐ',tag:'通過',desc:'何も消費せず先へ進む。',apply:()=>log('冒険者に別れを告げ、先へ進んだ。')}
+    ]},
+    {title:'怪しい魔法陣',sub:'床の魔法陣が、ダイスのような光を放っている。',opts:[
+      {name:'魔法陣に触れる',tag:'運試し',desc:'成功すると特殊ダイスを得る。失敗するとHPを失う。',apply:()=>{if(Math.random()<.65&&p.slots.length<18){const k=shuffle(Object.keys(DICE_T).filter(x=>x!=='normal'))[0];p.slots.push(k);log(`魔法陣が反応！ ${DICE_T[k].name}を手に入れた！`)}else if(Math.random()<.5){const d=Math.max(1,R(p.maxHp*.12));p.hp=Math.max(1,p.hp-d);log(`魔力が暴発！ HPを${fmt(d)}失った。`)}else{const g=pr(25);p.gold+=g;log(`魔法陣から${fmt(g)}Gがこぼれ落ちた。`)}}},
+      {name:'魔法陣を調べる',tag:'安全',desc:'少額のゴールドを見つける。',apply:()=>{const g=pr(15+rnd(18));p.gold+=g;log(`魔法陣のそばで${fmt(g)}Gを見つけた。`)}},
+      {name:'無視する',tag:'通過',desc:'危険を避けて先へ進む。',apply:()=>log('魔法陣には触れずに通り過ぎた。')}
+    ]}
+  ];
+  const ev=events[rnd(events.length)];
+  const o=await pick(ev.title,ev.sub,ev.opts);
+  await o.apply();render();
+}
+
+/* ===== 階クリア報酬（1階ごとに3択で1つ） ===== */
+function rewardOptions(boss){
+  const cands=[];
+  if(boss){
+    const rares=shuffle(ITEMS.filter(it=>it.rare&&!ownedItem(it.id))).slice(0,3);
+    if(rares.length>=2){
+      const out=rares.map(itemOpt);
+      if(Math.random()<0.15){const lg=shuffle(ITEMS.filter(it=>it.leg&&!ownedItem(it.id)))[0];if(lg)out[rnd(out.length)]=itemOpt(lg)}
+      return out;
+    }
+  }
+  SKILLS.filter(s=>!p.skills.includes(s.id)).forEach(s=>cands.push({w:3,id:'s_'+s.id,name:s.name,tag:s.type==='atk'?'スキル':`魔法・MP${s.mp}`,desc:skDesc(s),apply:()=>{p.skills.push(s.id);log(`${s.name}を覚えた！`)}}));
+  ITEMS.filter(it=>!it.leg&&!ownedItem(it.id)).forEach(it=>cands.push({w:it.rare?1:3,...itemOpt(it)}));
+  cands.push({w:8,id:'dice1',name:'ダイス+1',tag:'ダイス',desc:'ふつうのダイスが1個増える。',apply:()=>{p.slots.push('normal');log('ダイスが1個増えた！')}});
+  cands.push({w:4,id:'dice2',name:'ダイス+2',tag:'ダイス',desc:'ふつうのダイスが2個増える。',apply:()=>{p.slots.push('normal','normal');log('ダイスが2個増えた！')}});
+  Object.keys(DICE_T).filter(k=>k!=='normal').forEach(k=>cands.push({w:3,id:'d_'+k,name:DICE_T[k].name,tag:'特殊ダイス',desc:`${DICE_T[k].desc}ダイスが1個増える。`,apply:()=>{p.slots.push(k);log(`${DICE_T[k].name}を手に入れた！`)}}));
+  cands.push({w:3,id:'hp',name:'命の実',tag:'強化',desc:'最大HPが20増え、20回復する。',apply:()=>{p.maxHp+=20;p.hp+=20;log('最大HPが20増えた！')}});
+  cands.push({w:2,id:'mp',name:'魔力の実',tag:'強化',desc:'最大MPが5増え、5回復する。',apply:()=>{p.maxMp+=5;p.mp+=5;log('最大MPが5増えた！')}});
+  const out=[];
+  while(out.length<3&&cands.length){
+    const tot=cands.reduce((a,c)=>a+c.w,0);let r=Math.random()*tot,i=0;
+    for(;i<cands.length;i++){r-=cands[i].w;if(r<=0)break}
+    out.push(cands.splice(Math.min(i,cands.length-1),1)[0]);
+  }
+  if(Math.random()<0.06){const lg=shuffle(ITEMS.filter(it=>it.leg&&!ownedItem(it.id)))[0];if(lg&&out.length)out[rnd(out.length)]=itemOpt(lg)}
+  return out;
+}
+async function rewardPick(){
+  const o=await pick(`地下${stage+1}階クリア！`,e.boss?'ボス報酬！レアな装備から1つ選ぼう。':'報酬を1つ選ぼう。',rewardOptions(e.boss));
+  await o.apply();render();
+}
+async function passivePick(){
+  const pl=PASSIVES.filter(s=>!p.passives.includes(s.id));
+  if(!pl.length)return;
+  const opts=shuffle(pl).slice(0,3).map(s=>({id:s.id,name:s.name,desc:s.desc,tag:'パッシブ'}));
+  const o=await pick('ボスを倒した！','特別な力を1つ選ぼう。ずっと効果が続く。',opts);
+  p.passives.push(o.id);
+  if(o.id==='dice'){p.slots.push('normal','normal')}
+  log(`${o.name}を身につけた！`);render();
+}
+
+/* ===== 勝利・次の階へ ===== */
+async function win(){
+  log(`${e.name}を倒した！`);render();await sleep(500);
+  const goldMul=equipped().reduce((m,it)=>m*(it.goldMul||1),1);
+  const earned=R(e.gold*goldMul);log(`${fmt(earned)}Gを獲得。`);popup('scene','+'+fmt(earned)+'G','gold');p.gold+=earned;
+  for(const it of equipped()){if(it.onWin){const g=it.onWin();if(g>0){p.gold+=g;log(`${it.name}：${fmt(g)}G増えた！`)}}if(it.onWinHeal){const h=it.onWinHeal();if(h>0){p.hp=Math.min(p.maxHp,p.hp+h);log(`${it.name}：HPが${fmt(h)}回復！`)}}if(it.onWinMp){p.mp=Math.min(p.maxMp,p.mp+it.onWinMp);log(`${it.name}：MPが${it.onWinMp}回復！`)}}
+  p.maxHp=Math.round(p.maxHp*CFG.floorHpMul)+CFG.floorHp;p.maxMp+=CFG.floorMp;
+  const h=Math.round(p.maxHp*CFG.winHeal)+CFG.floorHp;
+  p.hp=Math.min(p.maxHp,p.hp+h);p.mp=Math.min(p.maxMp,p.mp+CFG.winMp);
+  render();saveBest();
+  const finalBoss=stage===FLOORS-1&&!p.endless;
+  if(!finalBoss)await rewardPick();
+  if(e.boss&&!finalBoss)await passivePick();
+  const due=!finalBoss&&shopAfter(stage+1);
+  if(!finalBoss)persist(stage+1,due,due);
+  if(due){await shop();persist(stage+1,false,false)}
+  // ショップだけでなく、階層の合間にランダムイベントも発生する。
+  const eventChance=due ? .18 : (e.boss ? .22 : .42);
+  if(!finalBoss&&Math.random()<eventChance){await randomEvent();persist(stage+1,false,true)}
+  await nextFloor();
+}
+async function nextFloor(){
+  stage++;
+  if(stage>=FLOORS&&!p.endless){stage=FLOORS-1;clearSave();showEnd(true);return}
+  if(p.endless&&stage%FLOORS===0)await inflate();
+  await startBattle();busy=false;render();
+}
+async function inflate(){
+  const tier=tierOf(stage);
+  growSlots();
+  log(`インフレ突入！（段階${tier}）全ての装備枠が1つ増えた。`);render();
+  const pl=ITEMS.filter(it=>(it.rare||it.leg)&&!ownedItem(it.id));
+  const out=[];
+  while(out.length<3&&pl.length){
+    const tot=pl.reduce((a,it)=>a+(it.leg?1:2),0);let r=Math.random()*tot,i=0;
+    for(;i<pl.length;i++){r-=(pl[i].leg?1:2);if(r<=0)break}
+    out.push(pl.splice(Math.min(i,pl.length-1),1)[0]);
+  }
+  if(out.length){
+    const o=await pick(`インフレ突入！ 地下${stage+1}階へ`,'全ての装備枠が1つ増えた！ 強力な装備を1つ選ぼう。',out.map(itemOpt));
+    await o.apply();render();
+  }
+}
+async function enterEndless(){
+  p.endless=true;busy=true;
+  persist(stage+1,false,true);
+  await nextFloor();
+}
+async function resume(sv0){
+  p=restoreP(sv0.p);logLines=[];fullLog=[];turnNo=0;busy=true;
+  const next=Math.max(1,Math.floor(sv0.next));
+  stage=next-1;
+  const t=tpl(stage);
+  e={...t,name:tierPrefix(stage)+t.name,hp:0,maxHp:enemyHp(stage,t),atk:enemyAtk(stage,t),idx:0,spd:enemySpeed(stage,t),frozen:false,frozenUsed:false,weak:false,poison:null,burn:null,bleed:null,stun:0,vulnerable:false,gold:0};
+  $('#eart').innerHTML=e.art();
+  log('セーブデータを読み込んだ。');render();
+  if(sv0.shopPending&&shopAfter(next)){await shop();persist(next,false,false)}
+  await nextFloor();
+}
+async function lose(){
+  clearSave();
+  log('勇者はたおれた…');render();await sleep(800);showEnd(false);
+}
+function showEnd(clear){
+  const b=saveBest();
+  const learned=p.skills.map(id=>SKILL_BY[id].name).join('、');
+  const recTxt=`最大ダメージ ${fmt(p.maxHit||0)}／自己ベスト：地下${b.floor}階・最大ダメージ${fmt(b.maxHit)}`;
+  if(clear){
+    showOv('迷宮を制覇した！',`${e.name}を倒した。ダイス${p.slots.length}個、所持金は${fmt(p.gold)}G。`,
+      `<p>覚えた技と魔法：${learned}<br>${recTxt}</p><button class="card go legend" id="endless"><span class="ct" style="justify-content:center"><b>エンドレスに挑む（インフレ突入）</b></span><span class="cd" style="text-align:center;width:100%">全ての装備枠が+1。敵は加速度的に強くなる。</span></button><button class="card go" id="go"><span class="ct" style="justify-content:center"><b>もう一度あそぶ</b></span></button>`);
+    $('#endless').onclick=()=>{hideOv();enterEndless()};
+    $('#go').onclick=()=>{hideOv();newGame()};
+  }else screen('やられてしまった…',`地下${stage+1}階（${layerOf(stage).name}）、${e.name}との戦いで力尽きた。（ダイス${p.slots.length}個）`,`<p>覚えた技と魔法：${learned}<br>${recTxt}<br>所持金${fmt(p.gold)}Gは迷宮に消えた。</p>`,'はじめからやり直す',newGame);
+}
+
+/* ===== ログ画面 ===== */
+function logRows(mode){
+  let from=0;
+  if(mode==='turn'){for(let i=fullLog.length-1;i>=0;i--){if(fullLog[i].k==='turn'){from=i;break}}}
+  else if(mode==='battle'){for(let i=fullLog.length-1;i>=0;i--){if(fullLog[i].k==='battle'){from=i;break}}}
+  return fullLog.slice(from).map(x=>`<div class="lg ${x.k}">${x.t}</div>`).join('')||'<div class="lg">まだログがありません。</div>';
+}
+function openLog(mode){
+  const m=mode||'turn';
+  const label={turn:'このターン',battle:'この戦闘',all:'すべて'};
+  showOv('ログ','ダイスを振ってから攻撃・被ダメージまでの流れを確認できます。',
+    `<div class="lgbtns">${['turn','battle','all'].map(k=>`<button class="sbtn" data-i="${k}" ${k===m?'disabled':''}>${label[k]}</button>`).join('')}<button class="sbtn" data-i="close">閉じる</button></div><div class="lgbox" id="lgbox">${logRows(m)}</div>`);
+  const box=$('#lgbox');if(box)box.scrollTop=box.scrollHeight;
+  $('#ovB').onclick=ev=>{
+    const b=ev.target.closest('button[data-i]');if(!b||b.disabled)return;
+    $('#ovB').onclick=null;
+    if(b.dataset.i==='close'){hideOv();return}
+    openLog(b.dataset.i);
+  };
+}
+
+/* ===== 入力 ===== */
+$('#dice').addEventListener('click',ev=>{
+  const b=ev.target.closest('button');if(!b)return;
+  if(b.dataset.x==='log'){openLog('turn');return}
+  if(b.dataset.x==='home'){confirmHome();return}
+  if(busy)return;
+  if(b.dataset.f!==undefined){
+    const f=+b.dataset.f;
+    if(p.locked.has(f))p.locked=new Set();else if(p.dice.some(d=>d.v===f))p.locked=new Set([f]);
+    render();return;
+  }
+  if(b.dataset.x==='reroll')return reroll();
+  if(b.dataset.x==='end')return runTimeline();
+});
+$('#equip').addEventListener('click',ev=>{
+  const b=ev.target.closest('button[data-mv]');if(!b||busy)return;
+  if(moveSlot(b.dataset.mv))render();
+});
+$('#cmd').addEventListener('click',ev=>{
+  if(busy)return;
+  const q=ev.target.closest('button[data-q]');
+  if(q)return unqueue(+q.dataset.q);
+  const b=ev.target.closest('button[data-a]');if(!b)return;
+  const a=ALL[b.dataset.a];
+  if(!a||p.actionsLeft<=0||p.used[a.id]||(p.cds[a.id]||0)>0)return;
+  if(!a.calc(pool()).ok)return;
+  if(p.mp-reservedMp()<mpCost(a))return;
+  queueAction(a);
+});
+
+function confirmHome(){
+  showOv('ホームに戻る？',canSave?'クリア済みの階までの自動セーブは残り、「つづきから」で再開できます。いま戦っている階の途中経過は保存されません。':'この環境ではセーブできないため、いまの進行は失われます。',
+    `<button class="card go" id="hmYes"><span class="ct" style="justify-content:center"><b>ホームに戻る</b></span></button><button class="card go" id="hmNo"><span class="ct" style="justify-content:center"><b>ゲームを続ける</b></span></button>`);
+  $('#hmYes').onclick=()=>{try{saveBest()}catch(_){}location.reload()};
+  $('#hmNo').onclick=hideOv;
+}
+/* ===== 開始 ===== */
+function newGame(){
+  p={hp:CFG.hp,maxHp:CFG.hp,mp:CFG.mp,maxMp:CFG.mp,gold:0,
+     skills:['smash','fire'],passives:[],slots:Array(CFG.dice).fill('normal'),
+     equip:baseSlots(),endless:false,maxHit:0,cds:{},cdFresh:{},chain:0,revived:false,hot:null,rerollsUsed:0,bank:0,actionsBase:0,actionsUsed:0,rerollsBase:0,queue:[],st:{poison:null,stun:0,weak:0,silence:0},stNext:{stun:0,weak:0,silence:0},
+     shield:0,barrier:0,used:{},dice:[],locked:new Set(),rerolls:0,actions:CFG.actions,actionsLeft:0,dbl:false};
+  stage=0;logLines=[];fullLog=[];turnNo=0;busy=true;bestCache=loadBest();
+  startBattle().then(()=>{busy=false;render()});
+}
+function titleScreen(){
+  const sd=loadSave();
+  let armed=false;
+  const intro=`<ul><li>ダイスは何個でも増える。毎ターン全部振って、出目の集計を見る</li><li>ダメージの土台は出目の合計。同じ目が揃うとボーナス</li><li>キープできる目は1種類だけ。振り直しは1ターン3回</li><li>目にはそれぞれ役割がある（${[1,2,3,4,5,6].filter(f=>ROLE[f]).map(f=>ROLE[f].icon+f+'='+ROLE[f].name).join('　')}）。その目が多いほど、役割が強くなる</li><li>装備（武器・防具・アクセ2つ）は出目に反応して、上から順に発動する。▲▼で順番を入れ替えられる（＋と×で結果が変わる）</li><li>1ターンに予約できる行動は3回。各行動は1回まで。行動ボタンを押した時点の出目が、その行動の能力（速さ・威力）になる。予約した行動は、速さ（1の目の個数）の大きい順に、敵の行動もまぜて実行される（同じ速さなら味方が先）</li><li>スキルと魔法は、使うと数ターン使えなくなる。次の階にも持ち越しで、戦闘が終わったターンも1ターンに数える</li><li>1階クリアごとに報酬を1つ選ぶ。お店で装備やダイスを買える</li><li>20階をクリアすると、エンドレス（インフレ）に挑める。20階ごとに全ての装備枠が+1</li><li>階をクリアするたびに自動セーブ。やられたらセーブもお金も消える</li><li>見つけた装備・ダイス・スキルと、体験した状態異常は「図鑑」に記録される。図鑑はやられても消えない。選ぶ画面では、初めて見るものに「NEW」、見たことはあるが手に入れたことがないものに「未入手」が付く</li></ul>`;
+  const cont=sd?`<button class="card go" id="cont"><span class="ct" style="justify-content:center"><b>つづきから</b></span><span class="cd" style="text-align:center;width:100%">地下${Math.max(1,Math.floor(sd.next))+1}階${sd.p.endless?'（エンドレス）':''} ／ ダイス${(sd.p.slots||[]).length}個 ／ ${fmt(Number(sd.p.gold)||0)}G${sd.shopPending?' ／ お店の前':''}</span></button>`:'';
+  const start=`<button class="card go" id="go"><span class="ct" style="justify-content:center"><b id="goT">${sd?'はじめから':'冒険をはじめる'}</b></span></button>`;
+  const cdx=`<button class="card" id="cdx"><span class="ct" style="justify-content:center"><b>📖 図鑑</b></span><span class="cd" style="text-align:center;width:100%">装備 ${codexCount('items')}/${ITEMS.length} ／ ダイス ${codexCount('dice')}/${Object.keys(DICE_T).length} ／ スキル ${codexCount('skills')}/${SKILLS.length} ／ 状態異常 ${codexCount('status')}/${STATUS_FX.length}</span></button>`;
+  const prof=curProfile();
+  const pfb=`<button class="card" id="pf"><span class="ct"><b>👤 ${escHtml(prof.name)}</b><em>プロフィール切り替え</em></span><span class="cd">${escHtml(profileSummary(prof.id))}</span></button>`;
+  const bst=loadBest();
+  const note=(canSave?'':'<p class="sub" style="margin:10px 0 0">この環境ではセーブできません。</p>')+(bst.floor?`<p class="sub" style="margin:10px 0 0">自己ベスト：地下${bst.floor}階／最大ダメージ ${fmt(bst.maxHit)}</p>`:'');
+  showOv('ちいさな迷宮 ダイス版','全20階。スライムの洞窟、ゴブリンの砦、亡者の墓所、雷鳴の遺跡を抜けて、最深部を目指そう。',intro+pfb+cont+start+cdx+note+dataWarnNote());
+  $('#pf').onclick=()=>{pfArmed='';showProfiles()};
+  $('#cdx').onclick=()=>{codexTab='items';codexArmed=false;showCodex()};
+  if(sd)$('#cont').onclick=()=>{hideOv();resume(sd)};
+  $('#go').onclick=()=>{
+    if(sd&&!armed){armed=true;$('#goT').textContent='本当にはじめから？（セーブは消えます）';return}
+    hideOv();if(sd)clearSave();newGame();
+  };
+}
+
+bootGame();
+
+</script>
+<noscript>このゲームを遊ぶには、JavaScriptを有効にしてください。</noscript>
+</body>
+</html>
